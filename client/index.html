@@ -10,6 +10,9 @@
   <body>
     <div id="content">
       <h1>Kana Cards</h1>
+
+      <div id="alerts"></div>
+
       <section id="login">
         <h2>Login</h2>
         <form id="loginForm">
@@ -23,7 +26,9 @@
           </div>
           <button type="submit" class="btn btn-primary">Login</button>
         </form>
+        <div class="bottom"><a id="loginCreateLink" href="#">No account? Click here to create one.</a></div>
       </section>
+
       <section id="join">
         <h2>Join</h2>
         <form id="joinForm">
@@ -41,7 +46,9 @@
           </div>
           <button type="submit" class="btn btn-primary">Join</button>
         </form>
+        <div class="bottom"><a id="joinLoginLink" href="#">Already have an account? Click here to login.</a></div>
       </section>
+
       <section id="practice">
         <h2>Practice</h2>
         <div id="problem">
@@ -50,10 +57,12 @@
           <div id="problemChoices"></div>
         </div>
       </section>
+
       <section id="search">
         <h2>Search</h2>
         <!-- TODO -->
       </section>
+
     </div>
     <div id="loading"></div>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>

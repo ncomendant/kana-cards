@@ -12,7 +12,6 @@ export class NotificationManager {
     }
 
     public notify(type:string, message:string):void {
-        console.log(message);
         this.queue.push(new NotificationEvent(type, message));
         if (this.timeoutId == null) this.showNext();
     }

@@ -1,7 +1,8 @@
 import { Section } from "./section";
 import { App } from "../app";
-import { Path } from "../../../kana-cards-shared/Path";
+import { Path } from "../../../kana-cards-shared/path";
 import { NotificationType } from "../notification-type";
+import { FormValidator } from "../../../kana-cards-shared/form-validator";
 
 declare var $;
 
@@ -22,26 +23,32 @@ export class Login extends Section {
         //TODO - Better data validation
         this.$form.on("submit", (event:any) => {
             event.preventDefault();
+
             let username:string = this.$usernameInp.val().trim();
             let password:string = this.$passwordInp.val().trim();
-            if (username.length === 0) {
-                this.app.notify(NotificationType.DANGER, "Username cannot be blank.");
-            } else if (password.length === 0) {
-                this.app.notify(NotificationType.DANGER, "Password cannot be blank.");
-            } else {
-                app.post(Path.LOGIN, {username:username, password:password}, (data:any) => {
-                    if (data.err != null) {
-                        this.app.notify(NotificationType.DANGER, data.err);
-                        this.$usernameInp.focus();
-                    } else {
-                        this.app.token = data['token'];
-                        console.log(this.app.token);
-                        this.$form[0].reset();
-                        this.hide();
-                        this.app.practice.show();
-                    }
-                });
-            }
+
+            let validUsername:boolean = FormValidator.validateUsername(username, (err:string) => {
+                this.app.notify(NotificationType.DANGER, err);
+            });
+            
+            let validPassword:boolean = FormValidator.validatePassword(password, (err:string) => {
+                this.app.notify(NotificationType.DANGER, err);
+            });
+
+            if (!validUsername || !validPassword) return;
+
+            app.post(Path.LOGIN, {username:username, password:password}, (data:any) => {
+                if (data.err != null) {
+                    this.app.notify(NotificationType.DANGER, data.err);
+                    this.$usernameInp.focus();
+                } else {
+                    this.app.token = data['token'];
+                    console.log(this.app.token);
+                    this.$form[0].reset();
+                    this.hide();
+                    this.app.practice.show();
+                }
+            });
         });
 
         this.$joinLink.on("click", (event:any) => {

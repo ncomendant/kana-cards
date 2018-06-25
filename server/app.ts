@@ -1,6 +1,7 @@
 import { DatabaseManager } from "./database-manager";
-import { Path } from "../kana-cards-shared/Path";
+import { Path } from "../kana-cards-shared/path";
 import { Util } from "./util";
+import { FormValidator } from "../kana-cards-shared/form-validator";
 
 declare function require(moduleName:string):any;
 
@@ -87,9 +88,13 @@ export class App {
         app.post(Path.JOIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
-            this.db.insertUser(username, password, function(err:string){
-                res.send({err:err});
-            });
+            let validUsername:boolean = FormValidator.validateUsername(username);
+            let validPassword:boolean = FormValidator.validatePassword(password);
+            if (validUsername && validPassword) {
+                this.db.insertUser(username, password, function(err:string){
+                    res.send({err:err});
+                });
+            }
         });
 
         app.get(Path.PROBLEM, (req:any, res:any) => {

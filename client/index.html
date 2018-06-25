@@ -4,11 +4,58 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="./style.css">
     <title>Kana Cards</title>
   </head>
   <body>
-    <h1>Hello, world!</h1>
+    <div id="content">
+      <h1>Kana Cards</h1>
+      <section id="login">
+        <h2>Login</h2>
+        <form id="loginForm">
+          <div class="form-group">
+            <label for="loginUsernameInp">Username</label>
+            <input type="text" class="form-control" id="loginUsernameInp">
+          </div>
+          <div class="form-group">
+            <label for="loginPasswordInp">Password</label>
+            <input type="password" class="form-control" id="loginPasswordInp">
+          </div>
+          <button type="submit" class="btn btn-primary">Login</button>
+        </form>
+      </section>
+      <section id="join">
+        <h2>Join</h2>
+        <form id="joinForm">
+          <div class="form-group">
+            <label for="joinUsernameInp">Username</label>
+            <input type="text" class="form-control" id="joinUsernameInp">
+          </div>
+          <div class="form-group">
+            <label for="joinPasswordInp">Password</label>
+            <input type="password" class="form-control" id="joinPasswordInp">
+          </div>
+          <div class="form-group">
+            <label for="joinRepeatPasswordInp">Repeat Password</label>
+            <input type="password" class="form-control" id="joinRepeatPasswordInp">
+          </div>
+          <button type="submit" class="btn btn-primary">Join</button>
+        </form>
+      </section>
+      <section id="practice">
+        <h2>Practice</h2>
+        <div id="problem">
+          <div id="problemInfo"></div>
+          <div id="problemQuestion"></div>
+          <div id="problemChoices"></div>
+        </div>
+      </section>
+      <section id="search">
+        <h2>Search</h2>
+        <!-- TODO -->
+      </section>
+    </div>
+    <div id="loading"></div>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js" integrity="sha384-ZMP7rVo3mIykV+2+9J3UJ46jBk0WLaUAdn689aCwoqbBJiSnjAK/l8WvCWPIPm49" crossorigin="anonymous"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.min.js" integrity="sha384-smHYKdLADwkXOn1EmN1qk/HfnUcbVRZyYmZ4qpPea6sjB/pTJ0euyQp0Mk8ck+5T" crossorigin="anonymous"></script>

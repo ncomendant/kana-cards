@@ -1,0 +1,24 @@
+html, body, div {
+    padding: 0px;
+    margin: 0px;
+}
+
+body, section {
+    display: none;
+}
+
+#content {
+    width: 90%;
+    margin: 0px auto;
+}
+
+#loading {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, .8) url("./rsc/ajax-loader.gif") 50% 50% no-repeat;
+}

@@ -54,7 +54,6 @@ export class App {
             next();
         });
 
-        //TODO - data validation
         app.post(Path.LOGIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
@@ -84,7 +83,6 @@ export class App {
             //TODO
         });
 
-        //TODO - data validation
         app.post(Path.JOIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];

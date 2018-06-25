@@ -18,5 +18,6 @@ export class Section {
 
     public hide():void {
         this.$section.hide();
+        this.app.clearNotifications();
     }
 }

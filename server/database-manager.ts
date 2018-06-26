@@ -1,5 +1,7 @@
 import { Config } from "./config";
 import { Util } from "./util";
+import { Problem } from "../kana-cards-shared/problem";
+import { KanaManager } from "./kana-manager";
 
 declare function require(moduleName:string):any;
 
@@ -7,6 +9,8 @@ declare function require(moduleName:string):any;
 let mysql:any = require('mysql');
 
 export class DatabaseManager {
+
+    private static readonly SRS_BASE:number = 5;
 
     private pool:any;
 
@@ -49,13 +53,11 @@ export class DatabaseManager {
         });
     }
 
-
-
-    public getProblem(username:string, callback:(problemData:any) => void):void {
+    public getProblem(username:string, callback:(problem:Problem) => void):void {
         this.pool.getConnection((err:any, connection:any) => {
-            this.fetchProblemData(username, connection, (problemData:any) => {
+            this.fetchProblemData(username, connection, (problemData:ProblemData) => {
                 if (problemData != null) {
-                    this.generateProblem(problemData, connection, function(problem:any) {
+                    this.generateProblem(problemData, connection, (problem:Problem) => {
                         connection.release();
                         callback(problem);
                     });
@@ -67,23 +69,94 @@ export class DatabaseManager {
         });
     }
 
-    private generateProblem(problemData:any, connection:any, callback:(problem:any) => void):void {
-        let type:string = (Math.random() < 0.5) ? "recognition" : "production";
-        //todo
-        callback(null);
+    private generateProblem(problemData:ProblemData, connection:any, callback:(problem:Problem) => void):void {
+        let problem:Problem = new Problem();
+        problem.id = problemData.id;
+        problem.worth = this.calculateWorth(problemData.mastery, problemData.nextDue);
+        if (problemData.type === "kana") {
+            if (Math.random() < 0.5) { //kana -> romaji
+                problem.question = problemData.value;
+                let answer:string = KanaManager.toRomaji(problemData.value);
+                problem.choices = KanaManager.randomRomaji(4);
+                problem.answerIndex = this.finalizeChoices(problem.choices, answer);
+            } else { //romaji -> kana
+                problem.question = KanaManager.toRomaji(problemData.value);
+                let answer:string = problemData.value;
+                problem.choices = KanaManager.randomKana(4);
+                problem.answerIndex = this.finalizeChoices(problem.choices, answer);
+            }
+            callback(problem);
+        } else if (problemData.type === "vocabulary") {
+            this.fetchVocabularyById(parseInt(problemData.value), connection, (vocab:any) => {
+                if (Math.random() < 0.5) { //reading -> meaning
+                    problem.question = vocab.reading;
+                    if (vocab.kanji != null && vocab.kanji.length > 0) problem.question = vocab.kanji + "\n" + problem.question;
+                    this.fetchRandomWords("meaning", 4, connection, (choices:string[]) => {
+                        problem.choices = choices;
+                        problem.answerIndex = this.finalizeChoices(choices, vocab.meaning);
+                        callback(problem);
+                    });
+                } else { //meaning -> reading
+                    problem.question = vocab.meaning;
+                    this.fetchRandomWords("reading", 4, connection, (choices:string[]) => {
+                        problem.choices = choices;
+                        problem.answerIndex = this.finalizeChoices(choices, vocab.reading);
+                        callback(problem);
+                    });
+                }
+            });
+        } else {
+            throw new Error("Unknown problem type: " + problemData.type);
+        }
+    }
+
+    private fetchVocabularyById(id:number, connection:any, callback:(vocab:any) => void):void {
+        let sql:string = 'SELECT kanji, reading, meaning FROM vocabulary WHERE id=?';
+        connection.query(sql, [id], (err:any, res:any[], fields:any) => {
+            if (err != null) throw new Error(err);
+            if (res.length === 0) callback(null);
+            callback(res[0]);
+        });
+    }
+
+    private fetchRandomWords(fieldName:string, length:number, connection:any, callback:(words:string[]) => void):void {
+        let sql:string = `SELECT ${fieldName} FROM vocabulary ORDER BY RAND() LIMIT ${length}`;
+        connection.query(sql, (err:any, res:any[], fields:any) => {
+            if (err != null) throw new Error(err);
+            let words:string[] = [];
+            for (let item of res) {
+                words.push(item[fieldName]);
+            }
+            callback(words);
+        });
+    }
+
+    private finalizeChoices(choices:string[], answer:string):number {
+        if (choices.indexOf(answer) < 0) choices[0] = answer;
+        Util.shuffle(choices);
+        return (choices.indexOf(answer));
+    }
+
+    private calculateWorth(mastery:number, nextDue:number):number {
+        let now:number = new Date().getTime()/1000;
+        let gap:number = Math.pow(DatabaseManager.SRS_BASE, mastery);
+        let lastDue:number = nextDue - gap;
+        let worth:number = (now-lastDue)/gap;
+        if (worth > 1) worth = 1;
+        return worth;
     }
 
 
-    private fetchProblemData(username:string, connection:any, callback:(problemData:any) => void):void {
-        this.fetchRandomDueCard(username, connection, (problemData:any) => {
+    private fetchProblemData(username:string, connection:any, callback:(ProblemData:any) => void):void {
+        this.fetchRandomDueCard(username, connection, (problemData:ProblemData) => {
             if (problemData != null) {
                 callback(problemData);
             } else {
-                this.fetchNewCard(username, connection, (problemData:any) => {
+                this.fetchNewCard(username, connection, (problemData:ProblemData) => {
                     if (problemData != null) {
                         callback(problemData);
                     } else {
-                        this.fetchNextDueCard(username, connection, (problemData:any) => {
+                        this.fetchNextDueCard(username, connection, (problemData:ProblemData) => {
                             callback(problemData);
                         });
                     }
@@ -97,8 +170,12 @@ export class DatabaseManager {
             sql += endingSql;
             connection.query(sql, data, (err:any, res:any[], fields:any) => {
                 if (err) throw new Error(err);
-                if (res.length === 0) callback(null);
-                else callback(res[0]);
+                if (res.length === 0) {
+                    callback(null);
+                } else {
+                    let result:any = res[0];
+                    callback(new ProblemData(result.cardId, result.value, result.type, result.mastery, result.nextDue));
+                }
             });
     }
 
@@ -112,7 +189,6 @@ export class DatabaseManager {
             if (problemData == null) {
                 callback(null);
             } else {
-                console.log(problemData);
                 problemData.value = 0;
                 problemData.nextDue = 0;
                 let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
@@ -127,4 +203,8 @@ export class DatabaseManager {
     private fetchNextDueCard(username:string, connection:any, callback:(problemData:any) => void):void {
         this.fetchCard('AND masteries.username=? ORDER BY nextDue ASC LIMIT 1', [username], connection, callback);
     }
+}
+
+class ProblemData {
+    public constructor(public id:number, public value:string, public type:string, public mastery:number, public nextDue:number){}
 }

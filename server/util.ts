@@ -15,5 +15,18 @@ export class Util {
         return crypto.randomBytes(64).toString('hex').slice(0, length);
     }
 
+    public static shuffle(arr:any[], clone:boolean = false):any[] {
+        if (clone) {
+            arr = arr.slice(0);
+        }
+        for (let i:number = arr.length-1; i >= 0; i--) {
+            let j:number = Math.floor(Math.random() * (i+1));
+            let x:any = arr[i];
+            arr[i] = arr[j];
+            arr[j] = x;
+        }
+        return arr;
+    }
+
     private constructor(){}
 }

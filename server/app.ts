@@ -2,7 +2,7 @@ import { DatabaseManager } from "./database-manager";
 import { Path } from "../kana-cards-shared/path";
 import { Util } from "./util";
 import { FormValidator } from "../kana-cards-shared/form-validator";
-import { KanaConverter } from "./kana-converter";
+import { KanaManager } from "./kana-manager";
 
 declare function require(moduleName:string):any;
 
@@ -19,7 +19,7 @@ export class App {
         this.usernames = new Map();
         this.tokens = new Map();
 
-        KanaConverter.load();
+        KanaManager.load();
 
         this.db = new DatabaseManager();
         

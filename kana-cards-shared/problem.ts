@@ -4,4 +4,5 @@ export class Problem {
     public answerIndex:number;
     public id:number;
     public worth:number;
+    public mastery:number;
 }

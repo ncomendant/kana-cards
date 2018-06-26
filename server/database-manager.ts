@@ -2,6 +2,7 @@ import { Config } from "./config";
 import { Util } from "./util";
 import { Problem } from "../kana-cards-shared/problem";
 import { KanaManager } from "./kana-manager";
+import { SrsManager } from "./srs-manager";
 
 declare function require(moduleName:string):any;
 
@@ -9,8 +10,6 @@ declare function require(moduleName:string):any;
 let mysql:any = require('mysql');
 
 export class DatabaseManager {
-
-    private static readonly SRS_BASE:number = 5;
 
     private pool:any;
 
@@ -31,7 +30,7 @@ export class DatabaseManager {
             if (res.length > 0) {
                 let salt:string = res[0]['salt'];
                 let hashedPassword:string = res[0]['password'];
-                if (hashedPassword === this.util.hashPassword(salt, password)) { //password is correct
+                if (hashedPassword === Util.hashPassword(salt, password)) { //password is correct
                     callback(true);
                 } else {
                     callback(false);
@@ -69,10 +68,20 @@ export class DatabaseManager {
         });
     }
 
+    public updateMastery(username:string, cardId:number, mastery:number, callback:() => void = null):void {
+        let nextDue:number = SrsManager.calculateNextDue(mastery);
+        let sql:string = 'UPDATE masteries SET value=?, nextDue=? WHERE username=? AND cardId=?';
+        this.pool.query(sql, [mastery, nextDue, username, cardId], (err:any, res:any[], fields:any) => {
+            if (err != null) throw new Error(err);
+            if (callback != null) callback();
+        });
+    }
+
     private generateProblem(problemData:ProblemData, connection:any, callback:(problem:Problem) => void):void {
         let problem:Problem = new Problem();
         problem.id = problemData.id;
-        problem.worth = this.calculateWorth(problemData.mastery, problemData.nextDue);
+        problem.mastery = problemData.mastery;
+        problem.worth = SrsManager.calculateProblemWorth(problemData.mastery, problemData.nextDue);
         if (problemData.type === "kana") {
             if (Math.random() < 0.5) { //kana -> romaji
                 problem.question = problemData.value;
@@ -137,16 +146,6 @@ export class DatabaseManager {
         return (choices.indexOf(answer));
     }
 
-    private calculateWorth(mastery:number, nextDue:number):number {
-        let now:number = new Date().getTime()/1000;
-        let gap:number = Math.pow(DatabaseManager.SRS_BASE, mastery);
-        let lastDue:number = nextDue - gap;
-        let worth:number = (now-lastDue)/gap;
-        if (worth > 1) worth = 1;
-        return worth;
-    }
-
-
     private fetchProblemData(username:string, connection:any, callback:(ProblemData:any) => void):void {
         this.fetchRandomDueCard(username, connection, (problemData:ProblemData) => {
             if (problemData != null) {
@@ -167,16 +166,17 @@ export class DatabaseManager {
 
     private fetchCard(endingSql:string, data:any[], connection:any, callback:(problemData:any) => void):void {
         let sql:string = 'SELECT cards.value, cards.type, cards.id as cardId, masteries.value as mastery, masteries.nextDue FROM cards LEFT JOIN masteries ON cards.id=masteries.cardId ';
-            sql += endingSql;
-            connection.query(sql, data, (err:any, res:any[], fields:any) => {
-                if (err) throw new Error(err);
-                if (res.length === 0) {
-                    callback(null);
-                } else {
-                    let result:any = res[0];
-                    callback(new ProblemData(result.cardId, result.value, result.type, result.mastery, result.nextDue));
-                }
-            });
+        sql += endingSql;
+        
+        connection.query(sql, data, (err:any, res:any[], fields:any) => {
+            if (err) throw new Error(err);
+            if (res.length === 0) {
+                callback(null);
+            } else {
+                let result:any = res[0];
+                callback(new ProblemData(result.cardId, result.value, result.type, result.mastery, result.nextDue));
+            }
+        });
     }
 
     private fetchRandomDueCard(username:string, connection:any, callback:(problemData:any) => void):void {
@@ -184,15 +184,15 @@ export class DatabaseManager {
         this.fetchCard('WHERE username=? AND nextDue<=? ORDER BY RAND() LIMIT 1', [username, now], connection, callback);
     }
 
-    private fetchNewCard(username:string, connection:any, callback:(problemData:any) => void):void {
-        this.fetchCard('AND masteries.username=? ORDER BY id ASC LIMIT 1', [username], connection, (problemData:any) => {
+    private fetchNewCard(username:string, connection:any, callback:(problemData:ProblemData) => void):void {
+        this.fetchCard('AND masteries.username=? WHERE masteries.value IS NULL ORDER BY id ASC LIMIT 1', [username], connection, (problemData:ProblemData) => {
             if (problemData == null) {
                 callback(null);
             } else {
-                problemData.value = 0;
+                problemData.mastery = 0;
                 problemData.nextDue = 0;
                 let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
-                connection.query(sql, [username, problemData.cardId, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {
+                connection.query(sql, [username, problemData.id, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {
                     if (err != null) throw new Error(err);
                     callback(problemData);
                 });

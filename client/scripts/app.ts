@@ -8,7 +8,7 @@ declare var $;
 
 export class App {
 
-    public token:string;
+    private _token:string;
 
     private readonly _join:Join;
     private readonly _login:Login;
@@ -41,18 +41,22 @@ export class App {
         this.notificationManager.clear();
     }
 
-    public post(path:string, data:any, callback:(data?:any) => void):void {
-        this.ajax($.post, path, data, callback);
+    public post(path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
+        this.ajax($.post, path, data, callback, showLoading);
     }
 
-    public get(path:string, data:any, callback:(data?:any) => void):void {
-        this.ajax($.get, path, data, callback);
+    public get(path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
+        this.ajax($.get, path, data, callback, showLoading);
     }
 
-    private ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, callback:(data?:any) => void):void {
-        this.$loading.show();
+    private ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
+        if (this._token != null) {
+            if (data == null) data = {};
+            data['token'] = this._token;
+        }
+        if (showLoading) this.$loading.show();
         fn(this.serverUrl+path, data, (data:any) => {
-            this.$loading.hide();
+            if (showLoading) this.$loading.hide();
             callback(data);
         });
     }
@@ -67,6 +71,10 @@ export class App {
 
     public get practice():Practice {
         return this._practice;
+    }
+
+    public set token(value:string) {
+        this._token = value;
     }
 }
 

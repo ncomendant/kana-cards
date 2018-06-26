@@ -43,7 +43,6 @@ export class Login extends Section {
                     this.$usernameInp.focus();
                 } else {
                     this.app.token = data['token'];
-                    console.log(this.app.token);
                     this.$form[0].reset();
                     this.hide();
                     this.app.practice.show();

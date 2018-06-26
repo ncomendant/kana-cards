@@ -31,9 +31,9 @@ export class NotificationManager {
         let $alert:any = $(`<div class='alert alert-${event.type}' role='alert'>${event.message}</div>`);
         $alert.hide();
         this.$alerts.append($alert);
-        $alert.fadeIn(500);
+        $alert.fadeIn(200);
         this.timeoutId = setTimeout(() => {
-            $alert.fadeOut(500, () => {
+            $alert.fadeOut(200, () => {
                 $alert.remove();
                 this.timeoutId = null;
                 this.showNext();

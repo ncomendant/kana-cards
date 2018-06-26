@@ -3,6 +3,8 @@ import { Path } from "../kana-cards-shared/path";
 import { Util } from "./util";
 import { FormValidator } from "../kana-cards-shared/form-validator";
 import { KanaManager } from "./kana-manager";
+import { Problem } from "../kana-cards-shared/problem";
+import { SrsManager } from "./srs-manager";
 
 declare function require(moduleName:string):any;
 
@@ -13,11 +15,12 @@ export class App {
 
     private usernames:Map<string, string> //token, username
     private tokens:Map<string, string> //username, token
+    private problems:Map<string, Problem> //username, problem
 
     public constructor(port:number) {
-
         this.usernames = new Map();
         this.tokens = new Map();
+        this.problems = new Map();
 
         KanaManager.load();
 
@@ -47,6 +50,8 @@ export class App {
     private initServer(port:number):void {
         let app:any = express();
 
+
+        //Required to read POST data
         app.use(express.json());
         app.use(express.urlencoded({ extended: true }));
 
@@ -103,21 +108,36 @@ export class App {
             let token:string = req.query.token;
             let username:string = this.usernames[token];
             if (username != null) {
-                this.db.getProblem(username, (problem:any) => {
-
+                this.db.getProblem(username, (problem:Problem) => {
+                    this.problems[username] = problem;        
+                    let answerIndex:number = problem.answerIndex;
+                    problem.answerIndex = null; //Temporarily set answerIndex to null to avoid sending it to user.
+                    res.send({problem:problem});
+                    problem.answerIndex = answerIndex;
                 });
             }
         });
 
         app.get(Path.RESPONSE, (req:any, res:any) => {
-            //TODO
+            let token:string = req.query.token;
+            let responseIndex:number = parseInt(req.query.index);
+            if (isNaN(responseIndex)) return;
+            let username:string = this.usernames[token];
+            let problem:Problem = this.problems[username];
+            if (problem != null) {
+                delete this.problems[username];
+                let correct:boolean = problem.answerIndex === responseIndex;
+                let mastery:number = (correct) ? problem.mastery + problem.worth : 0;
+                let nextGap:number = SrsManager.calculateNextGap(mastery);
+                this.db.updateMastery(username, problem.id, mastery, () => {
+                    res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});
+                });
+            }
         });
 
         app.get(Path.SEARCH, (req:any, res:any) => {
             //TODO
         });
-
-        
 
         app.listen(port);
     }

@@ -99,7 +99,7 @@ export class DatabaseManager {
             this.fetchVocabularyById(parseInt(problemData.value), connection, (vocab:any) => {
                 if (Math.random() < 0.5) { //reading -> meaning
                     problem.question = vocab.reading;
-                    if (vocab.kanji != null && vocab.kanji.length > 0) problem.question = vocab.kanji + "\n" + problem.question;
+                    if (vocab.kanji != null && vocab.kanji.length > 0) problem.question = vocab.kanji + "<br>" + problem.question;
                     this.fetchRandomWords("meaning", 4, connection, (choices:string[]) => {
                         problem.choices = choices;
                         problem.answerIndex = this.finalizeChoices(choices, vocab.meaning);

@@ -27,7 +27,7 @@ export class DatabaseManager {
             if (res.length > 0) {
                 let salt:string = res[0]['salt'];
                 let hashedPassword:string = res[0]['password'];
-                if (hashedPassword === Util.hashPassword(salt, password)) { //password is correct
+                if (hashedPassword === this.util.hashPassword(salt, password)) { //password is correct
                     callback(true);
                 } else {
                     callback(false);
@@ -49,7 +49,82 @@ export class DatabaseManager {
         });
     }
 
-    public selectNextProblemData(username:string, callback:(err:string, problemData:any) => void):void {
 
+
+    public getProblem(username:string, callback:(problemData:any) => void):void {
+        this.pool.getConnection((err:any, connection:any) => {
+            this.fetchProblemData(username, connection, (problemData:any) => {
+                if (problemData != null) {
+                    this.generateProblem(problemData, connection, function(problem:any) {
+                        connection.release();
+                        callback(problem);
+                    });
+                } else {
+                    connection.release();
+                    callback(null);
+                }
+            });
+        });
+    }
+
+    private generateProblem(problemData:any, connection:any, callback:(problem:any) => void):void {
+        let type:string = (Math.random() < 0.5) ? "recognition" : "production";
+        //todo
+        callback(null);
+    }
+
+
+    private fetchProblemData(username:string, connection:any, callback:(problemData:any) => void):void {
+        this.fetchRandomDueCard(username, connection, (problemData:any) => {
+            if (problemData != null) {
+                callback(problemData);
+            } else {
+                this.fetchNewCard(username, connection, (problemData:any) => {
+                    if (problemData != null) {
+                        callback(problemData);
+                    } else {
+                        this.fetchNextDueCard(username, connection, (problemData:any) => {
+                            callback(problemData);
+                        });
+                    }
+                });
+            }
+        });
+    }
+
+    private fetchCard(endingSql:string, data:any[], connection:any, callback:(problemData:any) => void):void {
+        let sql:string = 'SELECT cards.value, cards.type, cards.id as cardId, masteries.value as mastery, masteries.nextDue FROM cards LEFT JOIN masteries ON cards.id=masteries.cardId ';
+            sql += endingSql;
+            connection.query(sql, data, (err:any, res:any[], fields:any) => {
+                if (err) throw new Error(err);
+                if (res.length === 0) callback(null);
+                else callback(res[0]);
+            });
+    }
+
+    private fetchRandomDueCard(username:string, connection:any, callback:(problemData:any) => void):void {
+        let now:number = new Date().getTime()/1000;
+        this.fetchCard('WHERE username=? AND nextDue<=? ORDER BY RAND() LIMIT 1', [username, now], connection, callback);
+    }
+
+    private fetchNewCard(username:string, connection:any, callback:(problemData:any) => void):void {
+        this.fetchCard('AND masteries.username=? ORDER BY id ASC LIMIT 1', [username], connection, (problemData:any) => {
+            if (problemData == null) {
+                callback(null);
+            } else {
+                console.log(problemData);
+                problemData.value = 0;
+                problemData.nextDue = 0;
+                let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
+                connection.query(sql, [username, problemData.cardId, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {
+                    if (err != null) throw new Error(err);
+                    callback(problemData);
+                });
+            }
+        });
+    }
+
+    private fetchNextDueCard(username:string, connection:any, callback:(problemData:any) => void):void {
+        this.fetchCard('AND masteries.username=? ORDER BY nextDue ASC LIMIT 1', [username], connection, callback);
     }
 }

@@ -2,6 +2,7 @@ import { DatabaseManager } from "./database-manager";
 import { Path } from "../kana-cards-shared/path";
 import { Util } from "./util";
 import { FormValidator } from "../kana-cards-shared/form-validator";
+import { KanaConverter } from "./kana-converter";
 
 declare function require(moduleName:string):any;
 
@@ -14,10 +15,13 @@ export class App {
     private tokens:Map<string, string> //username, token
 
     public constructor(port:number) {
-        this.db = new DatabaseManager();
 
         this.usernames = new Map();
         this.tokens = new Map();
+
+        KanaConverter.load();
+
+        this.db = new DatabaseManager();
         
         this.initServer(port);
     }
@@ -96,7 +100,13 @@ export class App {
         });
 
         app.get(Path.PROBLEM, (req:any, res:any) => {
-            //TODO
+            let token:string = req.query.token;
+            let username:string = this.usernames[token];
+            if (username != null) {
+                this.db.getProblem(username, (problem:any) => {
+
+                });
+            }
         });
 
         app.get(Path.RESPONSE, (req:any, res:any) => {

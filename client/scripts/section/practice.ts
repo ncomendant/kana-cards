@@ -18,6 +18,9 @@ export class Practice extends Section {
 
     private $choiceList:any[];
 
+    private problemActive:boolean;
+    private promptIntervalId:number;
+
     public constructor(app:App) {
         super("practice", app);
         this.$problem = $("#problem");
@@ -26,9 +29,18 @@ export class Practice extends Section {
         this.$problemWorth = $("#problemWorth");
         this.$problemQuestion = $("#problemQuestion");
         this.$problemChoices = $("#problemChoices");
-        this.$choiceList = [];
 
-        this.$problem.fadeTo(0, 0);
+        this.$choiceList = [];
+        this.problemActive = false;
+
+        this.$problem.fadeTo(0, 0);   
+
+        $(document).on("click", () => {
+            if (this.problemActive) return;
+            clearInterval(this.promptIntervalId);
+            this.app.clearNotifications();
+            this.requestProblem();
+        });
     }
 
     private requestProblem():void {
@@ -57,7 +69,10 @@ export class Practice extends Section {
             this.$problemChoices.append($choice);
             //add click event handler
             (($choice:any, index:number) => {
-                $choice.on("click", () => {
+                $choice.on("click", (event:any) => {
+                    if (!this.problemActive) return;
+                    this.problemActive = false;
+                    event.stopPropagation();
                     this.app.clearNotifications();
                     $choice.addClass('selected');
                     this.app.get(Path.RESPONSE, {index:index}, (feedback:any) => {
@@ -66,7 +81,7 @@ export class Practice extends Section {
                 });
             })($choice, i);
         }
-
+        this.problemActive = true;
         this.$problem.fadeTo(100, 1);
     }
 
@@ -80,16 +95,16 @@ export class Practice extends Section {
         this.$choiceList[answerIndex].addClass('answer');
 
         if (correct) {
-            this.app.notify(NotificationType.SUCCESS, `Good job! You'll see this card again in ${gapText}.`);
+            this.app.notify(NotificationType.SUCCESS, `Great job! You'll see this card again in ${gapText}.`);
+            setTimeout(() => {
+                this.requestProblem();
+            }, 1000);
         } else {
             this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
+            this.promptIntervalId = setInterval(() => {
+                this.app.notify(NotificationType.INFO, 'Click anywhere to continue.');
+            }, 10000);
         }
-
-        setTimeout(() => {
-            this.requestProblem();
-        }, 1000);
-
-        console.log(feedback);
     }
 
     private prettifyTime(seconds:number):string {

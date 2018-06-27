@@ -18,7 +18,7 @@ export class FormValidator {
             .isType("string", onFail, "Password must be a string.")
             .greaterThan(0, onFail, "Password cannot be blank.")
             .not.greaterThan(256, onFail, "Password cannot be greater than 256 characters.")
-            .not.lessThen(3, onFail, "Password must be at least 3 characters.")
+            .not.lessThan(3, onFail, "Password must be at least 3 characters.")
             .valid;
     }
 

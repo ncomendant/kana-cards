@@ -15,6 +15,8 @@ let request = require("request");
 let express = require("express");
 
 export class App {
+    private static readonly DEMO_USERNAME:string = "DEMO";
+
     private db:DatabaseManager;
 
     private users:Map<string, User>; //token, User
@@ -35,6 +37,7 @@ export class App {
     }
 
     private voidExistingToken(username:string):boolean { //return true if token was voided
+        if (username === App.DEMO_USERNAME) return false; //multiple tokens may exist for demo account
         let existingToken:string = this.tokens[username];
         if (existingToken != null) {
             delete this.tokens[username];
@@ -92,6 +95,7 @@ export class App {
         app.post(Path.LOGIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
+
             let validUsername:boolean = FormValidator.validateUsername(username);
             let validPassword:boolean = FormValidator.validatePassword(password);
             if (!validUsername || !validPassword) {
@@ -138,6 +142,7 @@ export class App {
         app.post(Path.JOIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
+
             let validUsername:boolean = FormValidator.validateUsername(username);
             let validPassword:boolean = FormValidator.validatePassword(password);
 
@@ -158,7 +163,9 @@ export class App {
             let user:User = this.users[token];
             if (user != null) {
                 delete this.users[token];
-                delete this.tokens[user.name];
+                if (user.name !== App.DEMO_USERNAME) {
+                    delete this.tokens[user.name];
+                }
             }
         });
 

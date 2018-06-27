@@ -21,6 +21,13 @@ export class Practice extends Section {
     private problemActive:boolean;
     private promptIntervalId:number;
 
+    private voiceEnabled:boolean;
+
+    //audio
+    private audioCtx:any;
+    private voiceAudio:any;
+
+
     public constructor(app:App) {
         super("practice", app);
         this.$problem = $("#problem");
@@ -33,7 +40,12 @@ export class Practice extends Section {
         this.$choiceList = [];
         this.problemActive = false;
 
-        this.$problem.fadeTo(0, 0);   
+        this.audioCtx = new (window['AudioContext'] || window['webkitAudioContext'])(); 
+        this.voiceAudio = null;
+
+        this.voiceEnabled = true;
+
+        this.$problem.fadeTo(0, 0);
 
         $(document).on("click", () => {
             if (this.problemActive) return;
@@ -44,6 +56,7 @@ export class Practice extends Section {
     }
 
     private requestProblem():void {
+        this.voiceAudio = null;
         this.$problem.fadeTo(100, 0, () => {
             this.app.get(Path.PROBLEM, null, (data:any) => {
                 this.displayProblem(data.problem);
@@ -89,22 +102,45 @@ export class Practice extends Section {
         let correct:boolean = feedback.correct;
         let answerIndex:number = feedback.answerIndex;
         let nextGap:number = feedback.nextGap;
-        
-        let gapText:string = this.prettifyTime(nextGap);
 
+        if (this.voiceEnabled) {
+            this.fetchVoice(() => {
+                this.voiceAudio.start(0);
+                this.completeFeedback(correct, answerIndex, nextGap);
+            });
+        } else {
+            this.completeFeedback(correct, answerIndex, nextGap);
+        }
+    }
+
+    private completeFeedback(correct:boolean, answerIndex:number, nextGap:number):void {
         this.$choiceList[answerIndex].addClass('answer');
-
+        let gapText:string = this.prettifyTime(nextGap);
         if (correct) {
             this.app.notify(NotificationType.SUCCESS, `Great job! You'll see this card again in ${gapText}.`);
             setTimeout(() => {
                 this.requestProblem();
             }, 1000);
         } else {
-            this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
-            this.promptIntervalId = setInterval(() => {
-                this.app.notify(NotificationType.INFO, 'Click anywhere to continue.');
-            }, 10000);
+            this.fetchVoice(() => {
+                this.voiceAudio.start(0);
+                this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
+                this.promptIntervalId = setInterval(() => {
+                    this.app.notify(NotificationType.INFO, 'Click anywhere to continue.');
+                }, 10000);
+            });
         }
+    }
+
+    private fetchVoice(callback:() => void = null):void {
+        this.app.binaryGet(Path.VOICE, (buffer:any) => {
+            this.voiceAudio = this.audioCtx.createBufferSource();
+            this.audioCtx.decodeAudioData(buffer, (audioBuffer:any) => {
+                this.voiceAudio.buffer = audioBuffer;
+                this.voiceAudio.connect(this.audioCtx.destination);
+                callback();
+            });
+        });
     }
 
     private prettifyTime(seconds:number):string {

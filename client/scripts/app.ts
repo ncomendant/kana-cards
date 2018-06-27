@@ -8,7 +8,7 @@ declare var $;
 
 export class App {
 
-    private _token:string;
+    public token:string;
 
     private readonly _join:Join;
     private readonly _login:Login;
@@ -49,10 +49,22 @@ export class App {
         this.ajax($.get, path, data, callback, showLoading);
     }
 
+    public binaryGet(path:string, callback:(buffer:any) => void):void {
+        let req:any = new XMLHttpRequest();
+        req.open("GET", `${this.serverUrl}${path}?token=${this.token}`, true);
+        req.responseType = "arraybuffer";
+
+        req.onload = function(event:any) {
+            callback(req.response);
+        }
+
+        req.send();
+    }
+
     private ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
-        if (this._token != null) {
+        if (this.token != null) {
             if (data == null) data = {};
-            data['token'] = this._token;
+            data['token'] = this.token;
         }
         if (showLoading) this.$loading.show();
         fn(this.serverUrl+path, data, (data:any) => {
@@ -71,10 +83,6 @@ export class App {
 
     public get practice():Practice {
         return this._practice;
-    }
-
-    public set token(value:string) {
-        this._token = value;
     }
 }
 

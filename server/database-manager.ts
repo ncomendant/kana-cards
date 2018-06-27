@@ -83,6 +83,7 @@ export class DatabaseManager {
         problem.mastery = problemData.mastery;
         problem.worth = SrsManager.calculateProblemWorth(problemData.mastery, problemData.nextDue);
         if (problemData.type === "kana") {
+            problem.voiceText = problemData.value;
             if (Math.random() < 0.5) { //kana -> romaji
                 problem.question = problemData.value;
                 let answer:string = KanaManager.toRomaji(problemData.value);
@@ -97,6 +98,7 @@ export class DatabaseManager {
             callback(problem);
         } else if (problemData.type === "vocabulary") {
             this.fetchVocabularyById(parseInt(problemData.value), connection, (vocab:any) => {
+                problem.voiceText = vocab.reading;
                 if (Math.random() < 0.5) { //reading -> meaning
                     problem.question = vocab.reading;
                     if (vocab.kanji != null && vocab.kanji.length > 0) problem.question = vocab.kanji + "<br>" + problem.question;

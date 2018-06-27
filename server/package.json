@@ -10,7 +10,8 @@
     "express": "4.16.x",
     "mysql": "2.15.x",
     "request": "2.87.x",
-    "sha.js": "2.4.x"
+    "sha.js": "2.4.x",
+    "@google-cloud/text-to-speech": "0.2.x"
   },
   "author": "Nicholas Comendant",
   "license": "ISC"

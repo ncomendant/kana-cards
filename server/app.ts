@@ -5,6 +5,7 @@ import { FormValidator } from "../kana-cards-shared/form-validator";
 import { KanaManager } from "./kana-manager";
 import { Problem } from "../kana-cards-shared/problem";
 import { SrsManager } from "./srs-manager";
+import { VoiceSynthesizer } from "./voice-synthesizer";
 
 declare function require(moduleName:string):any;
 
@@ -16,16 +17,21 @@ export class App {
     private usernames:Map<string, string> //token, username
     private tokens:Map<string, string> //username, token
     private problems:Map<string, Problem> //username, problem
+    private lastVoiceTexts:Map<string, string> //username, voicePatch
+
+    private voiceSynthesizer:VoiceSynthesizer;
 
     public constructor(port:number) {
         this.usernames = new Map();
         this.tokens = new Map();
         this.problems = new Map();
+        this.lastVoiceTexts = new Map();
 
         KanaManager.load();
 
         this.db = new DatabaseManager();
         
+        this.voiceSynthesizer = new VoiceSynthesizer();
         this.initServer(port);
     }
 
@@ -110,12 +116,28 @@ export class App {
             if (username != null) {
                 this.db.getProblem(username, (problem:Problem) => {
                     this.problems[username] = problem;        
+                    //temporarily hide answerIndex and voiceText so client cannot see them
                     let answerIndex:number = problem.answerIndex;
-                    problem.answerIndex = null; //Temporarily set answerIndex to null to avoid sending it to user.
+                    let voiceText:string = problem.voiceText;
+                    problem.answerIndex = null;
+                    problem.voiceText = null;
                     res.send({problem:problem});
                     problem.answerIndex = answerIndex;
+                    problem.voiceText = voiceText;
                 });
             }
+        });
+
+        app.get(Path.VOICE, (req:any, res:any) => {
+            let token:string = req.query.token;
+            let username:string = this.usernames[token];
+            if (username == null) return;
+            let voiceText:string = this.lastVoiceTexts[username];
+            if (voiceText == null) return;
+            delete this.lastVoiceTexts[username];
+            this.voiceSynthesizer.synthesize(voiceText, (path:string) => {
+                res.sendFile(path);
+            });
         });
 
         app.get(Path.RESPONSE, (req:any, res:any) => {
@@ -126,6 +148,7 @@ export class App {
             let problem:Problem = this.problems[username];
             if (problem != null) {
                 delete this.problems[username];
+                this.lastVoiceTexts[username] = problem.voiceText;
                 let correct:boolean = problem.answerIndex === responseIndex;
                 let mastery:number = (correct) ? problem.mastery + problem.worth : 0;
                 let nextGap:number = SrsManager.calculateNextGap(mastery);

@@ -5,4 +5,5 @@ export class Problem {
     public id:number;
     public worth:number;
     public mastery:number;
+    public voiceText:string;
 }

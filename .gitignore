@@ -1,6 +1,7 @@
 server/node_modules
 *.js
 *.js.map
+kana-cards-*.json
 config.ts
 card-creator.ts
 vocabulary.txt

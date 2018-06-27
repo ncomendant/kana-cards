@@ -11,6 +11,10 @@ export class Util {
         return sha('sha256').update(preHashedPassword).digest('hex');
     }
 
+    public static hash(text:string, length:number = 256):string {
+        return sha('sha256').update(text).digest('hex').slice(0, length);
+    }
+
     public static generateToken(length:number):string { //cannot be greater than 128
         return crypto.randomBytes(64).toString('hex').slice(0, length);
     }

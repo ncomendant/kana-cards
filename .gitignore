@@ -1,6 +1,7 @@
 server/node_modules
 *.js
 *.js.map
+server/voice/*
 kana-cards-*.json
 config.ts
 card-creator.ts

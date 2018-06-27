@@ -6,6 +6,9 @@ html, body {
 h1 {
     text-align: center;
 }
+a {
+    font-weight: bold;
+}
 
 html, body, div {
     padding: 0px;

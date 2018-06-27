@@ -99,5 +99,5 @@ export class App {
 }
 
 $(document).ready(function() {
-    new App("http://localhost:3001");
+    new App("https://buildbright.net:3003");
 });

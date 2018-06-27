@@ -8,11 +8,15 @@ import { SrsManager } from "./srs-manager";
 import { VoiceSynthesizer } from "./voice-synthesizer";
 import { HttpError } from "../kana-cards-shared/http-error";
 import { User } from "./user";
+import { Config } from "./config";
 
 declare function require(moduleName:string):any;
 
-let request = require("request");
-let express = require("express");
+let fs:any = require("fs");
+let http:any = require("http");
+let https:any = require("https");
+let request:any = require("request");
+let express:any = require("express");
 
 export class App {
     private static readonly DEMO_USERNAME:string = "DEMO";
@@ -24,7 +28,7 @@ export class App {
 
     private voiceSynthesizer:VoiceSynthesizer;
 
-    public constructor(port:number) {
+    public constructor(httpPort:number, httpsPort:number) {
         this.users = new Map();
         this.tokens = new Map();
 
@@ -33,7 +37,8 @@ export class App {
         this.db = new DatabaseManager();
         this.voiceSynthesizer = new VoiceSynthesizer();
 
-        this.initServer(port);
+        this.initServer(httpPort, httpsPort);
+        console.log("Kana Cards server has started.");
     }
 
     private voidExistingToken(username:string):boolean { //return true if token was voided
@@ -76,9 +81,20 @@ export class App {
         });
     }
 
-    private initServer(port:number):void {
+    private initServer(httpPort:number, httpsPort:number):void {
         let app:any = express();
 
+        if (httpPort != null) {
+            http.createServer(app).listen(httpPort);
+        }
+
+        if (httpsPort != null) {
+            let options = {
+                key: fs.readFileSync(Config.SSL_PATH + 'privkey.pem'),
+                cert: fs.readFileSync(Config.SSL_PATH + 'fullchain.pem')
+            };
+            https.createServer(options, app).listen(httpsPort);
+        }
 
         //Required to read POST data
         app.use(express.json());
@@ -239,10 +255,8 @@ export class App {
         app.get(Path.SEARCH, (req:any, res:any) => {
             //TODO
         });
-
-        app.listen(port);
     }
 
 }
 
-new App(3001);
+new App(null, 3003);

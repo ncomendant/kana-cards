@@ -7,11 +7,13 @@ import { NotificationType } from "../notification-type";
 declare var $;
 
 export class Practice extends Section {
+
+    private $voiceCheck:any;
+
     private $problem:any;
     private $cardId:any;
     private $cardMastery:any;
     private $problemWorth:any;
-
 
     private $problemQuestion:any;
     private $problemChoices:any;
@@ -30,6 +32,9 @@ export class Practice extends Section {
 
     public constructor(app:App) {
         super("practice", app);
+
+        this.$voiceCheck = $("#voiceCheck");
+
         this.$problem = $("#problem");
         this.$cardId = $("#cardId");
         this.$cardMastery = $("#cardMastery");
@@ -52,6 +57,10 @@ export class Practice extends Section {
             clearInterval(this.promptIntervalId);
             this.app.clearNotifications();
             this.requestProblem();
+        });
+
+        this.$voiceCheck.on("change", () => {
+            this.voiceEnabled = !this.voiceEnabled;
         });
     }
 
@@ -122,13 +131,10 @@ export class Practice extends Section {
                 this.requestProblem();
             }, 1000);
         } else {
-            this.fetchVoice(() => {
-                this.voiceAudio.start(0);
-                this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
-                this.promptIntervalId = setInterval(() => {
-                    this.app.notify(NotificationType.INFO, 'Click anywhere to continue.');
-                }, 10000);
-            });
+            this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
+            this.promptIntervalId = setInterval(() => {
+                this.app.notify(NotificationType.INFO, 'Click anywhere to continue.');
+            }, 10000);
         }
     }
 

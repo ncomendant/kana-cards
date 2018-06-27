@@ -6,5 +6,6 @@ export class Path {
     public static readonly RESPONSE:string = '/response';
     public static readonly SEARCH:string = '/search';
     public static readonly VOICE:string = '/voice';
+    public static readonly LOGOUT:string = '/logout';
     private constructor(){}
 }

@@ -3,8 +3,9 @@ import { Login } from "./section/login";
 import { Practice } from "./section/practice";
 import { NotificationManager } from "./notification-manager";
 import { HttpError } from "../../kana-cards-shared/http-error";
+import { Path } from "../../kana-cards-shared/path";
 
-declare var $;
+declare var $, gapi;
 
 export class App {
 
@@ -31,6 +32,12 @@ export class App {
 
         $('body').fadeIn(500);
         this.login.show();
+
+        window.onbeforeunload = () => {
+            this.get(Path.LOGOUT, null);
+            let auth2:any = gapi.auth2.getAuthInstance();
+            auth2.signOut();
+        };
     }
 
     public notify(type:string, message:string):void {
@@ -41,11 +48,11 @@ export class App {
         this.notificationManager.clear();
     }
 
-    public post(path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
+    public post(path:string, data:any, callback:(data?:any) => void = null, showLoading:boolean = true):void {
         this.ajax($.post, path, data, callback, showLoading);
     }
 
-    public get(path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
+    public get(path:string, data:any, callback:(data?:any) => void = null, showLoading:boolean = true):void {
         this.ajax($.get, path, data, callback, showLoading);
     }
 
@@ -61,7 +68,7 @@ export class App {
         req.send();
     }
 
-    private ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, callback:(data?:any) => void, showLoading:boolean = true):void {
+    private ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, callback:(data?:any) => void = null, showLoading:boolean = true):void {
         if (this.token != null) {
             if (data == null) data = {};
             data['token'] = this.token;
@@ -72,7 +79,9 @@ export class App {
             if (data != null && data.err === HttpError.INVALID_TOKEN) {
                 window.location.reload(true);
             }
-            callback(data);
+            if (callback != null) {
+                callback(data);
+            }
         });
     }
 

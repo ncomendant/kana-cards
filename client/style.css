@@ -42,7 +42,7 @@ body, section {
     overflow-y: hidden;
 }
 
-.bottom {
+.bottom, #googleBtn {
     margin-top: 20px;
 }
 

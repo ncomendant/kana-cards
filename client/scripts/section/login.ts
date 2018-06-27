@@ -4,7 +4,7 @@ import { Path } from "../../../kana-cards-shared/path";
 import { NotificationType } from "../notification-type";
 import { FormValidator } from "../../../kana-cards-shared/form-validator";
 
-declare var $;
+declare var $, gapi;;
 
 export class Login extends Section {
     private $form:any;
@@ -19,8 +19,9 @@ export class Login extends Section {
         this.$usernameInp = $("#loginUsernameInp");
         this.$passwordInp = $("#loginPasswordInp");
         this.$joinLink = $("#loginCreateLink");
+
+        this.renderGoogleLoginBtn();
         
-        //TODO - Better data validation
         this.$form.on("submit", (event:any) => {
             event.preventDefault();
 
@@ -38,15 +39,7 @@ export class Login extends Section {
             if (!validUsername || !validPassword) return;
 
             app.post(Path.LOGIN, {username:username, password:password}, (data:any) => {
-                if (data.err != null) {
-                    this.app.notify(NotificationType.DANGER, data.err);
-                    this.$usernameInp.focus();
-                } else {
-                    this.app.token = data['token'];
-                    this.$form[0].reset();
-                    this.hide();
-                    this.app.practice.show();
-                }
+                this.completeLogin(data);
             });
         });
 
@@ -55,6 +48,35 @@ export class Login extends Section {
             this.$form[0].reset();
             this.hide();
             this.app.join.show();
+        });
+    }
+
+    private completeLogin(data:any):void {
+        if (data.err != null) {
+            this.app.notify(NotificationType.DANGER, data.err);
+            this.$usernameInp.focus();
+        } else {
+            this.app.token = data['token'];
+            this.$form[0].reset();
+            this.hide();
+            this.app.practice.show();
+        }
+    }
+
+    private renderGoogleLoginBtn():void {
+        gapi.signin2.render('googleBtn', {
+            scope: 'profile email',
+            longtitle: true,
+            theme: 'dark',
+            onsuccess: (googleUser:any) => {
+                let googleToken:string = googleUser.getAuthResponse().id_token;
+                this.app.post(Path.GOOGLE_LOGIN, {googleToken:googleToken}, (data:any) => {
+                    this.completeLogin(data);
+                });
+            },
+            onfailure: () => {
+                this.app.notify(NotificationType.DANGER, "Error occured with Google login.");
+            }
         });
     }
 

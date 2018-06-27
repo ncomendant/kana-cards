@@ -11,6 +11,7 @@ import { User } from "./user";
 
 declare function require(moduleName:string):any;
 
+let request = require("request");
 let express = require("express");
 
 export class App {
@@ -61,6 +62,17 @@ export class App {
         }
     }
 
+    private fetchGoogleEmail(token:string, callback:(email:string) => void):void {
+        request(`https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${encodeURIComponent(token)}`, (error, response, body) => {
+            if (error == null && response.statusCode == 200) {
+                var userFields = JSON.parse(body);
+                callback(userFields.email.toUpperCase());
+            } else {
+                callback(null);
+            }
+        });
+    }
+
     private initServer(port:number):void {
         let app:any = express();
 
@@ -92,12 +104,9 @@ export class App {
             this.db.validateLogin(username, password, (successful:boolean) => {
                 if (successful) {
                     this.voidExistingToken(username);
-
                     let token:string = this.generateUniqueToken();
                     this.tokens[username] = token;
-
                     this.users[token] = new User(token, username);
-
                     res.send({token:token});
                 } else {
                     res.send({err:'Login failed. Invalid username and/or password.'});
@@ -106,7 +115,24 @@ export class App {
         });
 
         app.post(Path.GOOGLE_LOGIN, (req:any, res:any) => {
-            //TODO
+            let googleToken:string = req.body['googleToken'];
+
+            if (typeof googleToken !== "string") {
+                res.send({err:HttpError.INVALID_PARAMETERS});
+                return;
+            }
+
+            this.fetchGoogleEmail(googleToken, (email:string) => {
+                if (email == null) {
+                    res.send({err:HttpError.INVALID_PARAMETERS});
+                    return;
+                }
+
+                let token:string = this.generateUniqueToken();
+                this.tokens[email] = token;
+                this.users[token] = new User(token, email);
+                res.send({token:token});
+            });
         });
 
         app.post(Path.JOIN, (req:any, res:any) => {
@@ -125,6 +151,15 @@ export class App {
             this.db.insertUser(username, password, function(err:string){
                 res.send({err:err});
             });
+        });
+
+        app.get(Path.LOGOUT, (req:any, res:any) => {
+            let token:string = req.query.token;
+            let user:User = this.users[token];
+            if (user != null) {
+                delete this.users[token];
+                delete this.tokens[user.name];
+            }
         });
 
         app.get(Path.PROBLEM, (req:any, res:any) => {

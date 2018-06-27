@@ -81,6 +81,10 @@ export class Practice extends Section {
         this.$cardMastery.html(`Word Mastery: ${mastery}`);
         this.$problemWorth.html(`Problem Value: ${worth}`);
 
+        if (worth < 1) {
+            this.app.notify(NotificationType.WARNING, "This card is being shown before it's due. Come back later to get max problem value.")
+        }
+
         this.$problemQuestion.html(problem.question);
 
         //populate choices

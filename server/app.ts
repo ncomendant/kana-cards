@@ -109,10 +109,6 @@ export class App {
             //TODO
         });
 
-        app.get(Path.GUEST_LOGIN, (req:any, res:any) => {
-            //TODO
-        });
-
         app.post(Path.JOIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];

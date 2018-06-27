@@ -3,6 +3,7 @@ import { Login } from "./section/login";
 import { Practice } from "./section/practice";
 import { NotificationType } from "./notification-type";
 import { NotificationManager } from "./notification-manager";
+import { HttpError } from "../../kana-cards-shared/http-error";
 
 declare var $;
 
@@ -69,6 +70,9 @@ export class App {
         if (showLoading) this.$loading.show();
         fn(this.serverUrl+path, data, (data:any) => {
             if (showLoading) this.$loading.hide();
+            if (data != null && data.err === HttpError.INVALID_TOKEN) {
+                window.location.reload(true);
+            }
             callback(data);
         });
     }

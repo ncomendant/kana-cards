@@ -6,6 +6,8 @@ import { KanaManager } from "./kana-manager";
 import { Problem } from "../kana-cards-shared/problem";
 import { SrsManager } from "./srs-manager";
 import { VoiceSynthesizer } from "./voice-synthesizer";
+import { HttpError } from "../kana-cards-shared/http-error";
+import { User } from "./user";
 
 declare function require(moduleName:string):any;
 
@@ -14,32 +16,28 @@ let express = require("express");
 export class App {
     private db:DatabaseManager;
 
-    private usernames:Map<string, string> //token, username
-    private tokens:Map<string, string> //username, token
-    private problems:Map<string, Problem> //username, problem
-    private lastVoiceTexts:Map<string, string> //username, voicePatch
+    private users:Map<string, User>; //token, User
+    private tokens:Map<string, string>; //username, token
 
     private voiceSynthesizer:VoiceSynthesizer;
 
     public constructor(port:number) {
-        this.usernames = new Map();
+        this.users = new Map();
         this.tokens = new Map();
-        this.problems = new Map();
-        this.lastVoiceTexts = new Map();
 
         KanaManager.load();
 
         this.db = new DatabaseManager();
-        
         this.voiceSynthesizer = new VoiceSynthesizer();
+
         this.initServer(port);
     }
 
-    private voidExistingToken(usernameKey:string):boolean { //return true if token was voided
-        let existingToken:string = this.tokens[usernameKey];
+    private voidExistingToken(username:string):boolean { //return true if token was voided
+        let existingToken:string = this.tokens[username];
         if (existingToken != null) {
-            delete this.tokens[usernameKey];
-            delete this.usernames[existingToken];
+            delete this.tokens[username];
+            delete this.users[existingToken];
             return true;
         }
         return false;
@@ -49,8 +47,18 @@ export class App {
         let token:string = null;
         do {
             token = Util.generateToken(64);
-        } while (this.usernames.has(token));
+        } while (this.users.has(token));
         return token;
+    }
+
+    private validateToken(token:string, res:any):User {
+        let user:User = this.users[token];
+        if (user != null) {
+            return user;
+        } else {
+            res.send({err:HttpError.INVALID_TOKEN});
+            return null;
+        }
     }
 
     private initServer(port:number):void {
@@ -72,18 +80,25 @@ export class App {
         app.post(Path.LOGIN, (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
+            let validUsername:boolean = FormValidator.validateUsername(username);
+            let validPassword:boolean = FormValidator.validatePassword(password);
+            if (!validUsername || !validPassword) {
+                res.send({err:HttpError.INVALID_PARAMETERS});
+                return;
+            }
+
+            username = username.toUpperCase(); //normalize case
+
             this.db.validateLogin(username, password, (successful:boolean) => {
                 if (successful) {
-                    let usernameKey:string = username.toUpperCase();
-
-                    this.voidExistingToken(usernameKey);
+                    this.voidExistingToken(username);
 
                     let token:string = this.generateUniqueToken();
                     this.tokens[username] = token;
-                    this.usernames[token] = username;
+
+                    this.users[token] = new User(token, username);
 
                     res.send({token:token});
-
                 } else {
                     res.send({err:'Login failed. Invalid username and/or password.'});
                 }
@@ -103,59 +118,84 @@ export class App {
             let password:string = req.body['password'];
             let validUsername:boolean = FormValidator.validateUsername(username);
             let validPassword:boolean = FormValidator.validatePassword(password);
-            if (validUsername && validPassword) {
-                this.db.insertUser(username, password, function(err:string){
-                    res.send({err:err});
-                });
+
+            if (!validUsername || !validPassword) {
+                res.send({err:HttpError.INVALID_PARAMETERS});
+                return;
             }
+
+            username = username.toUpperCase(); //normalize case
+
+            this.db.insertUser(username, password, function(err:string){
+                res.send({err:err});
+            });
         });
 
         app.get(Path.PROBLEM, (req:any, res:any) => {
-            let token:string = req.query.token;
-            let username:string = this.usernames[token];
-            if (username != null) {
-                this.db.getProblem(username, (problem:Problem) => {
-                    this.problems[username] = problem;        
-                    //temporarily hide answerIndex and voiceText so client cannot see them
-                    let answerIndex:number = problem.answerIndex;
-                    let voiceText:string = problem.voiceText;
-                    problem.answerIndex = null;
-                    problem.voiceText = null;
-                    res.send({problem:problem});
-                    problem.answerIndex = answerIndex;
-                    problem.voiceText = voiceText;
-                });
-            }
+            let user:User = this.validateToken(req.query.token, res);
+            if (user == null) return;
+
+            this.db.getProblem(user.name, (problem:Problem) => {
+                user.problem = problem;
+                //temporarily removes answerIndex and voiceText so client will not receive them
+                let answerIndex:number = problem.answerIndex;
+                let voiceText:string = problem.voiceText;
+                problem.answerIndex = null;
+                problem.voiceText = null;
+                //sends problem to client
+                res.send({problem:problem});
+                //places removed data back
+                problem.answerIndex = answerIndex;
+                problem.voiceText = voiceText;
+            });
         });
 
         app.get(Path.VOICE, (req:any, res:any) => {
-            let token:string = req.query.token;
-            let username:string = this.usernames[token];
-            if (username == null) return;
-            let voiceText:string = this.lastVoiceTexts[username];
-            if (voiceText == null) return;
-            delete this.lastVoiceTexts[username];
-            this.voiceSynthesizer.synthesize(voiceText, (path:string) => {
+            let user:User = this.users[req.query.token];
+            if (user == null) {
+                res.send(null);
+                return;
+            }
+
+            let lastVoiceText:string = user.lastVoiceText;
+            if (lastVoiceText == null) {
+                res.send(null);
+                return;
+            }
+            
+            user.lastVoiceText = null;
+
+            this.voiceSynthesizer.synthesize(lastVoiceText, (path:string) => {
                 res.sendFile(path);
             });
         });
 
         app.get(Path.RESPONSE, (req:any, res:any) => {
-            let token:string = req.query.token;
+            let user:User = this.validateToken(req.query.token, res);
+            if (user == null) return;
+            
             let responseIndex:number = parseInt(req.query.index);
-            if (isNaN(responseIndex)) return;
-            let username:string = this.usernames[token];
-            let problem:Problem = this.problems[username];
-            if (problem != null) {
-                delete this.problems[username];
-                this.lastVoiceTexts[username] = problem.voiceText;
-                let correct:boolean = problem.answerIndex === responseIndex;
-                let mastery:number = (correct) ? problem.mastery + problem.worth : 0;
-                let nextGap:number = SrsManager.calculateNextGap(mastery);
-                this.db.updateMastery(username, problem.id, mastery, () => {
-                    res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});
-                });
+
+            if (isNaN(responseIndex)) {
+                res.send({err:HttpError.INVALID_PARAMETERS});
+                return;
             }
+
+            let problem:Problem = user.problem;
+            if (problem == null) {
+                res.send({err:HttpError.NO_PROBLEM});
+                return;
+            }
+
+            user.lastVoiceText = problem.voiceText;
+            user.problem = null;
+
+            let correct:boolean = problem.answerIndex === responseIndex;
+            let mastery:number = (correct) ? problem.mastery + problem.worth : 0;
+            let nextGap:number = SrsManager.calculateNextGap(mastery);
+            this.db.updateMastery(user.name, problem.id, mastery, () => {
+                res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});
+            });
         });
 
         app.get(Path.SEARCH, (req:any, res:any) => {

@@ -11,7 +11,7 @@ export class Section {
     public constructor(name:string, app:App) {
         this.$section = $(`#${name}`);
         this.app = app;
-        this._visible = true;
+        this._visible = false;
     }
 
     public show():void {

@@ -53,7 +53,7 @@ export class Practice extends Section {
         this.$problem.fadeTo(0, 0);
 
         $(document).on("click", () => {
-            if (this.problemActive) return;
+            if (!this.visible || this.problemActive) return;
             clearInterval(this.promptIntervalId);
             this.app.clearNotifications();
             this.requestProblem();

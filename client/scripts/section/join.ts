@@ -28,6 +28,7 @@ export class Join extends Section {
 
             let username:string = this.$usernameInp.val();
             let password:string = this.$passwordInp.val();
+            let repeatPassword:string = this.$repeatPasswordInp.val();
 
             let validUsername:boolean = FormValidator.validateUsername(username, (err:string) => {
                 this.app.notify(NotificationType.DANGER, err);
@@ -37,7 +38,13 @@ export class Join extends Section {
                 this.app.notify(NotificationType.DANGER, err);
             });
 
+
             if (!validUsername || !validPassword) return;
+
+            if (password !== repeatPassword) {
+                this.app.notify(NotificationType.DANGER, "Passwords do not match.");
+                return;
+            }
 
             this.app.post(Path.JOIN, {username:username, password:password}, (data:any) => {
                 if (data.err != null) {

@@ -82,19 +82,7 @@ export class App {
     }
 
     private initServer(httpPort:number, httpsPort:number):void {
-        let app:any = express();
-
-        if (httpPort != null) {
-            http.createServer(app).listen(httpPort);
-        }
-
-        if (httpsPort != null) {
-            let options = {
-                key: fs.readFileSync(Config.SSL_PATH + 'privkey.pem'),
-                cert: fs.readFileSync(Config.SSL_PATH + 'fullchain.pem')
-            };
-            https.createServer(options, app).listen(httpsPort);
-        }
+        let app:any = express(); 
 
         //Required to read POST data
         app.use(express.json());
@@ -107,6 +95,18 @@ export class App {
             res.setHeader('Access-Control-Allow-Credentials', false);
             next();
         });
+
+        if (httpPort != null) {
+            http.createServer(app).listen(httpPort);
+        }
+
+        if (httpsPort != null) {
+            let options = {
+                key: fs.readFileSync(Config.SSL_PATH + 'privkey.pem'),
+                cert: fs.readFileSync(Config.SSL_PATH + 'fullchain.pem')
+            };
+            https.createServer(options, app).listen(httpsPort);
+        }
 
         app.post(Path.LOGIN, (req:any, res:any) => {
             let username:string = req.body['username'];
@@ -251,12 +251,8 @@ export class App {
                 res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});
             });
         });
-
-        app.get(Path.SEARCH, (req:any, res:any) => {
-            //TODO
-        });
     }
 
 }
 
-new App(null, 3003);
+new App(3003, null);

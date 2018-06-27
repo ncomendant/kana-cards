@@ -3,6 +3,6 @@ server/node_modules
 *.js.map
 server/voice/*
 kana-cards-*.json
-config.ts
+*/config.ts
 card-creator.ts
 vocabulary.txt

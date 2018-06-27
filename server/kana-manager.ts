@@ -1,6 +1,7 @@
 import { Util } from "./util";
 
 declare function require(moduleName:string):any;
+declare var __dirname;
 
 let fs = require('fs');
 
@@ -11,7 +12,7 @@ export class KanaManager {
     public static load():void {
         KanaManager.hiraganaCharacters = []
         KanaManager.hiraganaReadings = [];
-        let text:string = fs.readFileSync('./hiragana.txt', 'utf8');
+        let text:string = fs.readFileSync(__dirname+'/hiragana.txt', 'utf8');
         let rows:string[] = text.split("\r\n");
         for (let row of rows) {
             let fields:string[] = row.split("\t");

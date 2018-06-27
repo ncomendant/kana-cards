@@ -54,14 +54,14 @@ body, section {
 }
 
 #problem {
-    font-size: 24px;
+    font-size: 18px;
     font-family: Arial, Helvetica, sans-serif;
     text-align: center;
     width: 100%;
 }
 
 #problemQuestion {
-    font-size: 64px;
+    font-size: 48px;
 }
 
 #problemChoices {
@@ -93,15 +93,15 @@ body, section {
 
 #problemMetadata>span {
     display: inline-block;
-    width: 33%;
+    width: 50%;
 }
 
 #cardId {
     text-align: left;
 }
 
-#cardMaster {
-    text-align: center;
+#cardMastery {
+    text-align: left;
 }
 
 #problemWorth {

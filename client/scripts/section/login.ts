@@ -1,8 +1,8 @@
 import { Section } from "./section";
 import { App } from "../app";
-import { Path } from "../../../kana-cards-shared/path";
+import { Path } from "../../../study-amigo-shared/path";
 import { NotificationType } from "../notification-type";
-import { FormValidator } from "../../../kana-cards-shared/form-validator";
+import { FormValidator } from "../../../study-amigo-shared/form-validator";
 
 declare var $, gapi;;
 

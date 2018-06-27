@@ -2,8 +2,8 @@ import { Join } from "./section/join";
 import { Login } from "./section/login";
 import { Practice } from "./section/practice";
 import { NotificationManager } from "./notification-manager";
-import { HttpError } from "../../kana-cards-shared/http-error";
-import { Path } from "../../kana-cards-shared/path";
+import { HttpError } from "../../study-amigo-shared/http-error";
+import { Path } from "../../study-amigo-shared/path";
 import { Config } from "./config";
 
 declare var $, gapi;

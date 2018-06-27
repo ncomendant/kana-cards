@@ -1,7 +1,7 @@
 import { Section } from "./section";
 import { App } from "../app";
-import { Problem } from "../../../kana-cards-shared/problem";
-import { Path } from "../../../kana-cards-shared/path";
+import { Problem } from "../../../study-amigo-shared/problem";
+import { Path } from "../../../study-amigo-shared/path";
 import { NotificationType } from "../notification-type";
 
 declare var $;
@@ -11,7 +11,6 @@ export class Practice extends Section {
     
 
     private $problem:any;
-    private $cardId:any;
     private $cardMastery:any;
     private $problemWorth:any;
 
@@ -37,7 +36,6 @@ export class Practice extends Section {
         this.$voiceCheck = $("#voiceCheck");
 
         this.$problem = $("#problem");
-        this.$cardId = $("#cardId");
         this.$cardMastery = $("#cardMastery");
         this.$problemWorth = $("#problemWorth");
         this.$problemQuestion = $("#problemQuestion");
@@ -80,9 +78,8 @@ export class Practice extends Section {
     private displayProblem(problem:Problem):void {
         let mastery:number = Math.round(problem.mastery*100)/100;
         let worth:number = Math.round(problem.worth*100)/100;
-        this.$cardId.html(`ID: ${problem.id}`);
-        this.$cardMastery.html(`Mastery: ${mastery}`);
-        this.$problemWorth.html(`Value: ${worth}`);
+        this.$cardMastery.html(`Word Mastery: ${mastery}`);
+        this.$problemWorth.html(`Problem Value: ${worth}`);
 
         this.$problemQuestion.html(problem.question);
 
@@ -108,7 +105,15 @@ export class Practice extends Section {
             })($choice, i);
         }
         this.problemActive = true;
-        this.$problem.fadeTo(100, 1);
+
+        if (this.voiceEnabled) {
+            this.fetchVoice(() => {
+                this.playVoice();
+                this.$problem.fadeTo(100, 1);
+            });
+        } else {
+            this.$problem.fadeTo(100, 1);
+        }
     }
 
     private displayFeedback(feedback:any):void {
@@ -118,12 +123,16 @@ export class Practice extends Section {
 
         if (this.voiceEnabled) {
             this.fetchVoice(() => {
-                this.voiceAudio.start(0);
+                this.playVoice();
                 this.completeFeedback(correct, answerIndex, nextGap);
             });
         } else {
             this.completeFeedback(correct, answerIndex, nextGap);
         }
+    }
+
+    private playVoice():void {
+        if (this.voiceAudio != null) this.voiceAudio.start(0);
     }
 
     private completeFeedback(correct:boolean, answerIndex:number, nextGap:number):void {
@@ -133,7 +142,7 @@ export class Practice extends Section {
             this.app.notify(NotificationType.SUCCESS, `Great job! You'll see this card again in ${gapText}.`);
             setTimeout(() => {
                 this.requestProblem();
-            }, 1000);
+            }, 2000);
         } else {
             this.awaitingUser = true;
             this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
@@ -145,6 +154,10 @@ export class Practice extends Section {
 
     private fetchVoice(callback:() => void = null):void {
         this.app.binaryGet(Path.VOICE, (buffer:any) => {
+            if (buffer == null) {
+                this.voiceAudio = null;
+                return;
+            }
             this.voiceAudio = this.audioCtx.createBufferSource();
             this.audioCtx.decodeAudioData(buffer, (audioBuffer:any) => {
                 this.voiceAudio.buffer = audioBuffer;

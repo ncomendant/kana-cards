@@ -1,8 +1,8 @@
 import { Config } from "./config";
 import { Util } from "./util";
-import { Problem } from "../kana-cards-shared/problem";
-import { KanaManager } from "./kana-manager";
+import { Problem } from "../study-amigo-shared/problem";
 import { SrsManager } from "./srs-manager";
+import { VoiceSynthesizer } from "./voice-synthesizer";
 
 declare function require(moduleName:string):any;
 
@@ -68,7 +68,7 @@ export class DatabaseManager {
         });
     }
 
-    public updateMastery(username:string, cardId:number, mastery:number, callback:() => void = null):void {
+    public updateMastery(username:string, cardId:string, mastery:number, callback:() => void = null):void {
         let nextDue:number = SrsManager.calculateNextDue(mastery);
         let sql:string = 'UPDATE masteries SET value=?, nextDue=? WHERE username=? AND cardId=?';
         this.pool.query(sql, [mastery, nextDue, username, cardId], (err:any, res:any[], fields:any) => {
@@ -79,55 +79,31 @@ export class DatabaseManager {
 
     private generateProblem(problemData:ProblemData, connection:any, callback:(problem:Problem) => void):void {
         let problem:Problem = new Problem();
-        problem.id = problemData.id;
+        problem.id = problemData.spanish;
         problem.mastery = problemData.mastery;
         problem.worth = SrsManager.calculateProblemWorth(problemData.mastery, problemData.nextDue);
-        if (problemData.type === "kana") {
-            problem.voiceText = problemData.value;
-            if (Math.random() < 0.5) { //kana -> romaji
-                problem.question = problemData.value;
-                let answer:string = KanaManager.toRomaji(problemData.value);
-                problem.choices = KanaManager.randomRomaji(4);
-                problem.answerIndex = this.finalizeChoices(problem.choices, answer);
-            } else { //romaji -> kana
-                problem.question = KanaManager.toRomaji(problemData.value);
-                let answer:string = problemData.value;
-                problem.choices = KanaManager.randomKana(4);
-                problem.answerIndex = this.finalizeChoices(problem.choices, answer);
-            }
-            callback(problem);
-        } else if (problemData.type === "vocabulary") {
-            this.fetchVocabularyById(parseInt(problemData.value), connection, (vocab:any) => {
-                problem.voiceText = vocab.reading;
-                if (Math.random() < 0.5) { //reading -> meaning
-                    problem.question = vocab.reading;
-                    if (vocab.kanji != null && vocab.kanji.length > 0) problem.question = vocab.kanji + "<br>" + problem.question;
-                    this.fetchRandomWords("meaning", 4, connection, (choices:string[]) => {
-                        problem.choices = choices;
-                        problem.answerIndex = this.finalizeChoices(choices, vocab.meaning);
-                        callback(problem);
-                    });
-                } else { //meaning -> reading
-                    problem.question = vocab.meaning;
-                    this.fetchRandomWords("reading", 4, connection, (choices:string[]) => {
-                        problem.choices = choices;
-                        problem.answerIndex = this.finalizeChoices(choices, vocab.reading);
-                        callback(problem);
-                    });
-                }
-            });
-        } else {
-            throw new Error("Unknown problem type: " + problemData.type);
-        }
-    }
 
-    private fetchVocabularyById(id:number, connection:any, callback:(vocab:any) => void):void {
-        let sql:string = 'SELECT kanji, reading, meaning FROM vocabulary WHERE id=?';
-        connection.query(sql, [id], (err:any, res:any[], fields:any) => {
-            if (err != null) throw new Error(err);
-            if (res.length === 0) callback(null);
-            callback(res[0]);
-        });
+        if (Math.random() < 0.5) { //Spanish -> English
+            problem.question = problemData.spanish;
+            problem.questionVoice = VoiceSynthesizer.ES_SPANISH;
+            problem.answerVoice = VoiceSynthesizer.US_MALE_B;
+            let answer:string = problemData.english;
+            this.fetchRandomWords("english", 4, connection, (words:string[]) => {
+                problem.choices = words;
+                problem.answerIndex = this.finalizeChoices(words, answer);
+                callback(problem);
+            });
+        } else { //English -> Spanish
+            problem.question = problemData.english;
+            problem.questionVoice = VoiceSynthesizer.US_MALE_B;
+            problem.answerVoice = VoiceSynthesizer.ES_SPANISH;
+            let answer:string = problemData.spanish;
+            this.fetchRandomWords("spanish", 4, connection, (words:string[]) => {
+                problem.choices = words;
+                problem.answerIndex = this.finalizeChoices(words, answer);
+                callback(problem);
+            });
+        }
     }
 
     private fetchRandomWords(fieldName:string, length:number, connection:any, callback:(words:string[]) => void):void {
@@ -167,7 +143,7 @@ export class DatabaseManager {
     }
 
     private fetchCard(endingSql:string, data:any[], connection:any, callback:(problemData:any) => void):void {
-        let sql:string = 'SELECT cards.value, cards.type, cards.id as cardId, masteries.value as mastery, masteries.nextDue FROM cards LEFT JOIN masteries ON cards.id=masteries.cardId ';
+        let sql:string = 'SELECT vocabulary.spanish, vocabulary.english, masteries.value as mastery, masteries.nextDue FROM vocabulary LEFT JOIN masteries ON vocabulary.spanish=masteries.cardId ';
         sql += endingSql;
         
         connection.query(sql, data, (err:any, res:any[], fields:any) => {
@@ -176,7 +152,7 @@ export class DatabaseManager {
                 callback(null);
             } else {
                 let result:any = res[0];
-                callback(new ProblemData(result.cardId, result.value, result.type, result.mastery, result.nextDue));
+                callback(new ProblemData(result.spanish, result.english, result.mastery, result.nextDue));
             }
         });
     }
@@ -187,14 +163,14 @@ export class DatabaseManager {
     }
 
     private fetchNewCard(username:string, connection:any, callback:(problemData:ProblemData) => void):void {
-        this.fetchCard('AND masteries.username=? WHERE masteries.value IS NULL ORDER BY id ASC LIMIT 1', [username], connection, (problemData:ProblemData) => {
+        this.fetchCard('AND masteries.username=? WHERE masteries.value IS NULL ORDER BY RAND() LIMIT 1', [username], connection, (problemData:ProblemData) => {
             if (problemData == null) {
                 callback(null);
             } else {
                 problemData.mastery = 0;
                 problemData.nextDue = 0;
                 let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
-                connection.query(sql, [username, problemData.id, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {
+                connection.query(sql, [username, problemData.spanish, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {
                     if (err != null) throw new Error(err);
                     callback(problemData);
                 });
@@ -208,5 +184,5 @@ export class DatabaseManager {
 }
 
 class ProblemData {
-    public constructor(public id:number, public value:string, public type:string, public mastery:number, public nextDue:number){}
+    public constructor(public spanish:string, public english:string, public mastery:number, public nextDue:number){}
 }

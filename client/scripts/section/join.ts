@@ -1,8 +1,8 @@
 import { Section } from "./section";
 import { App } from "../app";
 import { NotificationType } from "../notification-type";
-import { Path } from "../../../kana-cards-shared/path";
-import { FormValidator } from "../../../kana-cards-shared/form-validator";
+import { Path } from "../../../study-amigo-shared/path";
+import { FormValidator } from "../../../study-amigo-shared/form-validator";
 
 declare var $;
 

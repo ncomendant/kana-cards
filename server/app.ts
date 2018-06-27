@@ -1,12 +1,11 @@
 import { DatabaseManager } from "./database-manager";
-import { Path } from "../kana-cards-shared/path";
+import { Path } from "../study-amigo-shared/path";
 import { Util } from "./util";
-import { FormValidator } from "../kana-cards-shared/form-validator";
-import { KanaManager } from "./kana-manager";
-import { Problem } from "../kana-cards-shared/problem";
+import { FormValidator } from "../study-amigo-shared/form-validator";
+import { Problem } from "../study-amigo-shared/problem";
 import { SrsManager } from "./srs-manager";
 import { VoiceSynthesizer } from "./voice-synthesizer";
-import { HttpError } from "../kana-cards-shared/http-error";
+import { HttpError } from "../study-amigo-shared/http-error";
 import { User } from "./user";
 import { Config } from "./config";
 
@@ -32,13 +31,11 @@ export class App {
         this.users = new Map();
         this.tokens = new Map();
 
-        KanaManager.load();
-
         this.db = new DatabaseManager();
         this.voiceSynthesizer = new VoiceSynthesizer();
 
         this.initServer(httpPort, httpsPort);
-        console.log("Kana Cards server has started.");
+        console.log("Study Amigo server has started.");
     }
 
     private voidExistingToken(username:string):boolean { //return true if token was voided
@@ -79,6 +76,15 @@ export class App {
                 callback(null);
             }
         });
+    }
+
+    private stripProblem(problem:Problem):Problem { //removes unnecessary problem information for sending to client
+        let strippedProblem:Problem = Object.assign({}, problem); //clone object
+        strippedProblem.id = null;
+        strippedProblem.answerIndex = null;
+        strippedProblem.questionVoice = null;
+        strippedProblem.answerVoice = null;
+        return strippedProblem;
     }
 
     private initServer(httpPort:number, httpsPort:number):void {
@@ -191,16 +197,9 @@ export class App {
 
             this.db.getProblem(user.name, (problem:Problem) => {
                 user.problem = problem;
-                //temporarily removes answerIndex and voiceText so client will not receive them
-                let answerIndex:number = problem.answerIndex;
-                let voiceText:string = problem.voiceText;
-                problem.answerIndex = null;
-                problem.voiceText = null;
-                //sends problem to client
-                res.send({problem:problem});
-                //places removed data back
-                problem.answerIndex = answerIndex;
-                problem.voiceText = voiceText;
+                user.pendingVoiceText = problem.question;
+                user.pendingVoice = problem.questionVoice;
+                res.send({problem:this.stripProblem(problem)});
             });
         });
 
@@ -211,15 +210,18 @@ export class App {
                 return;
             }
 
-            let lastVoiceText:string = user.lastVoiceText;
-            if (lastVoiceText == null) {
+            if (user.pendingVoiceText == null) {
                 res.send(null);
                 return;
             }
-            
-            user.lastVoiceText = null;
 
-            this.voiceSynthesizer.synthesize(lastVoiceText, (path:string) => {
+            let voiceText:string = user.pendingVoiceText;
+            let voice:any = user.pendingVoice;
+
+            user.pendingVoiceText = null;
+            user.pendingVoice = null;
+
+            this.voiceSynthesizer.synthesize(voiceText, voice, (path:string) => {
                 res.sendFile(path);
             });
         });
@@ -241,7 +243,9 @@ export class App {
                 return;
             }
 
-            user.lastVoiceText = problem.voiceText;
+            user.pendingVoiceText = problem.choices[problem.answerIndex];
+            user.pendingVoice = problem.answerVoice;
+
             user.problem = null;
 
             let correct:boolean = problem.answerIndex === responseIndex;

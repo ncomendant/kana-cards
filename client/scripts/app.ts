@@ -1,7 +1,6 @@
 import { Join } from "./section/join";
 import { Login } from "./section/login";
 import { Practice } from "./section/practice";
-import { NotificationType } from "./notification-type";
 import { NotificationManager } from "./notification-manager";
 import { HttpError } from "../../kana-cards-shared/http-error";
 

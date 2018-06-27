@@ -4,6 +4,7 @@ import { Practice } from "./section/practice";
 import { NotificationManager } from "./notification-manager";
 import { HttpError } from "../../kana-cards-shared/http-error";
 import { Path } from "../../kana-cards-shared/path";
+import { Config } from "./config";
 
 declare var $, gapi;
 
@@ -99,5 +100,5 @@ export class App {
 }
 
 $(document).ready(function() {
-    new App("https://buildbright.net:3003");
+    new App(Config.SERVER_URL);
 });

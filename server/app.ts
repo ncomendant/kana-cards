@@ -255,4 +255,4 @@ export class App {
 
 }
 
-new App(3003, null);
+new App(Config.HTTP_PORT, Config.HTTPS_PORT);

@@ -8,7 +8,7 @@ declare var $;
 
 export class Practice extends Section {
 
-    private $voiceCheck:any;
+    
 
     private $problem:any;
     private $cardId:any;
@@ -20,15 +20,16 @@ export class Practice extends Section {
 
     private $choiceList:any[];
 
+    private awaitingUser:boolean;
+
     private problemActive:boolean;
     private promptIntervalId:number;
 
-    private voiceEnabled:boolean;
-
     //audio
+    private $voiceCheck:any;
+    private voiceEnabled:boolean;
     private audioCtx:any;
     private voiceAudio:any;
-
 
     public constructor(app:App) {
         super("practice", app);
@@ -43,6 +44,8 @@ export class Practice extends Section {
         this.$problemChoices = $("#problemChoices");
 
         this.$choiceList = [];
+
+        this.awaitingUser = false;
         this.problemActive = false;
 
         this.audioCtx = new (window['AudioContext'] || window['webkitAudioContext'])(); 
@@ -53,7 +56,8 @@ export class Practice extends Section {
         this.$problem.fadeTo(0, 0);
 
         $(document).on("click", () => {
-            if (!this.visible || this.problemActive) return;
+            if (!this.visible || !this.awaitingUser) return;
+            this.awaitingUser = false;
             clearInterval(this.promptIntervalId);
             this.app.clearNotifications();
             this.requestProblem();
@@ -131,10 +135,11 @@ export class Practice extends Section {
                 this.requestProblem();
             }, 1000);
         } else {
+            this.awaitingUser = true;
             this.app.notify(NotificationType.DANGER, `Not quite. You'll see this card again in ${gapText}.`);
             this.promptIntervalId = setInterval(() => {
                 this.app.notify(NotificationType.INFO, 'Click anywhere to continue.');
-            }, 10000);
+            }, 5000);
         }
     }
 

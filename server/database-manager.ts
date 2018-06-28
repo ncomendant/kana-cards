@@ -167,7 +167,7 @@ export class DatabaseManager {
             if (problemData == null) {
                 callback(null);
             } else {
-                problemData.mastery = 0;
+                problemData.mastery = 1;
                 problemData.nextDue = 0;
                 let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
                 connection.query(sql, [username, problemData.spanish, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {

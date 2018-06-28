@@ -249,7 +249,7 @@ export class App {
             user.problem = null;
 
             let correct:boolean = problem.answerIndex === responseIndex;
-            let mastery:number = (correct) ? problem.mastery + problem.worth : 0;
+            let mastery:number = (correct) ? problem.mastery + problem.worth : 1;
             let nextGap:number = SrsManager.calculateNextGap(mastery);
             this.db.updateMastery(user.name, problem.id, mastery, () => {
                 res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});

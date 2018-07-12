@@ -114,7 +114,7 @@ export class App {
             https.createServer(options, app).listen(httpsPort);
         }
 
-        app.post(Path.LOGIN, (req:any, res:any) => {
+        app.post(Path.LOGIN, async (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
 
@@ -127,17 +127,16 @@ export class App {
 
             username = username.toUpperCase(); //normalize case
 
-            this.db.validateLogin(username, password, (successful:boolean) => {
-                if (successful) {
-                    this.voidExistingToken(username);
-                    let token:string = this.generateUniqueToken();
-                    this.tokens[username] = token;
-                    this.users[token] = new User(token, username);
-                    res.send({token:token});
-                } else {
-                    res.send({err:'Login failed. Invalid username and/or password.'});
-                }
-            });
+            const successful:boolean = await this.db.validateLogin(username, password);
+            if (successful) {
+                this.voidExistingToken(username);
+                let token:string = this.generateUniqueToken();
+                this.tokens[username] = token;
+                this.users[token] = new User(token, username);
+                res.send({token:token});
+            } else {
+                res.send({err:'Login failed. Invalid username and/or password.'});
+            }
         });
 
         app.post(Path.GOOGLE_LOGIN, (req:any, res:any) => {
@@ -161,7 +160,7 @@ export class App {
             });
         });
 
-        app.post(Path.JOIN, (req:any, res:any) => {
+        app.post(Path.JOIN, async (req:any, res:any) => {
             let username:string = req.body['username'];
             let password:string = req.body['password'];
 
@@ -175,9 +174,9 @@ export class App {
 
             username = username.toUpperCase(); //normalize case
 
-            this.db.insertUser(username, password, function(err:string){
-                res.send({err:err});
-            });
+            const err:string = await this.db.insertUser(username, password);
+            if (err) res.send({err:err});
+            else res.send(null);
         });
 
         app.get(Path.LOGOUT, (req:any, res:any) => {
@@ -191,16 +190,15 @@ export class App {
             }
         });
 
-        app.get(Path.PROBLEM, (req:any, res:any) => {
+        app.get(Path.PROBLEM, async (req:any, res:any) => {
             let user:User = this.validateToken(req.query.token, res);
             if (user == null) return;
 
-            this.db.getProblem(user.name, (problem:Problem) => {
-                user.problem = problem;
-                user.pendingVoiceText = problem.question;
-                user.pendingVoice = problem.questionVoice;
-                res.send({problem:this.stripProblem(problem)});
-            });
+            const problem:Problem = await this.db.getProblem(user.name);
+            user.problem = problem;
+            user.pendingVoiceText = problem.question;
+            user.pendingVoice = problem.questionVoice;
+            res.send({problem:this.stripProblem(problem)});
         });
 
         app.get(Path.VOICE, (req:any, res:any) => {
@@ -226,7 +224,7 @@ export class App {
             });
         });
 
-        app.get(Path.RESPONSE, (req:any, res:any) => {
+        app.get(Path.RESPONSE, async (req:any, res:any) => {
             let user:User = this.validateToken(req.query.token, res);
             if (user == null) return;
             
@@ -251,9 +249,8 @@ export class App {
             let correct:boolean = problem.answerIndex === responseIndex;
             let mastery:number = (correct) ? problem.mastery + problem.worth : 1;
             let nextGap:number = SrsManager.calculateNextGap(mastery);
-            this.db.updateMastery(user.name, problem.id, mastery, () => {
-                res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});
-            });
+            await this.db.updateMastery(user.name, problem.id, mastery);
+            res.send({correct:correct, nextGap:nextGap, answerIndex:problem.answerIndex});
         });
     }
 

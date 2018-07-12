@@ -22,7 +22,7 @@ export class Login extends Section {
 
         this.renderGoogleLoginBtn();
         
-        this.$form.on("submit", (event:any) => {
+        this.$form.on("submit", async (event:any) => {
             event.preventDefault();
 
             let username:string = this.$usernameInp.val().trim();
@@ -38,9 +38,8 @@ export class Login extends Section {
 
             if (!validUsername || !validPassword) return;
 
-            app.post(Path.LOGIN, {username:username, password:password}, (data:any) => {
-                this.completeLogin(data);
-            });
+            const data:any = await app.post(Path.LOGIN, {username:username, password:password});
+            this.completeLogin(data);
         });
 
         this.$joinLink.on("click", (event:any) => {
@@ -68,11 +67,10 @@ export class Login extends Section {
             scope: 'profile email',
             longtitle: true,
             theme: 'dark',
-            onsuccess: (googleUser:any) => {
+            onsuccess: async (googleUser:any) => {
                 let googleToken:string = googleUser.getAuthResponse().id_token;
-                this.app.post(Path.GOOGLE_LOGIN, {googleToken:googleToken}, (data:any) => {
-                    this.completeLogin(data);
-                });
+                const data:any = await this.app.post(Path.GOOGLE_LOGIN, {googleToken:googleToken});
+                this.completeLogin(data);
             },
             onfailure: () => {
                 this.app.notify(NotificationType.DANGER, "Error occured with Google login.");

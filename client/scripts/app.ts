@@ -49,40 +49,43 @@ export class App {
         this.notificationManager.clear();
     }
 
-    public post(path:string, data:any, callback:(data?:any) => void = null, showLoading:boolean = true):void {
-        this.ajax($.post, path, data, callback, showLoading);
+    public async post(path:string, data:any, showLoading:boolean = true):Promise<any> {
+        return await this.ajax($.post, path, data, showLoading);
     }
 
-    public get(path:string, data:any, callback:(data?:any) => void = null, showLoading:boolean = true):void {
-        this.ajax($.get, path, data, callback, showLoading);
+    public async get(path:string, data:any, showLoading:boolean = true):Promise<any> {
+        return await this.ajax($.get, path, data, showLoading);
     }
 
-    public binaryGet(path:string, callback:(buffer:any) => void):void {
-        let req:any = new XMLHttpRequest();
-        req.open("GET", `${this.serverUrl}${path}?token=${this.token}`, true);
-        req.responseType = "arraybuffer";
+    public async binaryGet(path:string):Promise<any> {
+        return new Promise((accept, reject) => {
+            let req:any = new XMLHttpRequest();
+            req.open("GET", `${this.serverUrl}${path}?token=${this.token}`, true);
+            req.responseType = "arraybuffer";
 
-        req.onload = function(event:any) {
-            callback(req.response);
-        }
+            req.onload = function(event:any) {
+                accept(req.response);
+            }
 
-        req.send();
+            req.send();
+        });
     }
 
-    private ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, callback:(data?:any) => void = null, showLoading:boolean = true):void {
+    private async ajax(fn:(url:string, data:any, callback:(data:any) => void) => void, path:string, data:any, showLoading:boolean):Promise<any> {
         if (this.token != null) {
             if (data == null) data = {};
             data['token'] = this.token;
         }
         if (showLoading) this.$loading.show();
-        fn(this.serverUrl+path, data, (data:any) => {
-            if (showLoading) this.$loading.hide();
-            if (data != null && data.err === HttpError.INVALID_TOKEN) {
-                window.location.reload(true);
-            }
-            if (callback != null) {
-                callback(data);
-            }
+        return new Promise((accept, reject) => {
+            fn(this.serverUrl+path, data, (data:any) => {
+                if (showLoading) this.$loading.hide();
+                if (data != null && data.err === HttpError.INVALID_TOKEN) {
+                    reject(data.err);
+                    window.location.reload(true);
+                }
+                accept(data);
+            });
         });
     }
 

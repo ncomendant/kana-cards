@@ -8,8 +8,6 @@ declare var $;
 
 export class Practice extends Section {
 
-    
-
     private $problem:any;
     private $cardMastery:any;
     private $problemWorth:any;
@@ -68,14 +66,13 @@ export class Practice extends Section {
 
     private requestProblem():void {
         this.voiceAudio = null;
-        this.$problem.fadeTo(100, 0, () => {
-            this.app.get(Path.PROBLEM, null, (data:any) => {
-                this.displayProblem(data.problem);
-            }, false);
+        this.$problem.fadeTo(100, 0, async () => {
+            const {problem} = await this.app.get(Path.PROBLEM, null, false);
+            this.displayProblem(problem);
         });
     }
 
-    private displayProblem(problem:Problem):void {
+    private async displayProblem(problem:Problem):Promise<any> {
         let mastery:number = Math.round(problem.mastery*100)/100;
         let worth:number = Math.round(problem.worth*100)/100;
         this.$cardMastery.html(`Word Mastery: ${mastery}`);
@@ -96,43 +93,38 @@ export class Practice extends Section {
             this.$problemChoices.append($choice);
             //add click event handler
             (($choice:any, index:number) => {
-                $choice.on("click", (event:any) => {
+                $choice.on("click", async (event:any) => {
                     if (!this.problemActive) return;
                     this.problemActive = false;
                     event.stopPropagation();
                     this.app.clearNotifications();
                     $choice.addClass('selected');
-                    this.app.get(Path.RESPONSE, {index:index}, (feedback:any) => {
-                        this.displayFeedback(feedback);
-                    }, false);
+                    const feedback = await this.app.get(Path.RESPONSE, {index:index}, false);
+                    this.displayFeedback(feedback);
                 });
             })($choice, i);
         }
         this.problemActive = true;
 
         if (this.voiceEnabled) {
-            this.fetchVoice(() => {
-                this.playVoice();
-                this.$problem.fadeTo(100, 1);
-            });
+            await this.fetchVoice();
+            this.playVoice();
+            this.$problem.fadeTo(100, 1);
         } else {
             this.$problem.fadeTo(100, 1);
         }
     }
 
-    private displayFeedback(feedback:any):void {
+    private async displayFeedback(feedback:any):Promise<any> {
         let correct:boolean = feedback.correct;
         let answerIndex:number = feedback.answerIndex;
         let nextGap:number = feedback.nextGap;
 
         if (this.voiceEnabled) {
-            this.fetchVoice(() => {
-                this.playVoice();
-                this.completeFeedback(correct, answerIndex, nextGap);
-            });
-        } else {
-            this.completeFeedback(correct, answerIndex, nextGap);
+            await this.fetchVoice();
+            this.playVoice();
         }
+        this.completeFeedback(correct, answerIndex, nextGap);
     }
 
     private playVoice():void {
@@ -156,19 +148,18 @@ export class Practice extends Section {
         }
     }
 
-    private fetchVoice(callback:() => void = null):void {
-        this.app.binaryGet(Path.VOICE, (buffer:any) => {
-            if (buffer == null) {
-                this.voiceAudio = null;
-                return;
-            }
-            this.voiceAudio = this.audioCtx.createBufferSource();
-            this.audioCtx.decodeAudioData(buffer, (audioBuffer:any) => {
-                this.voiceAudio.buffer = audioBuffer;
-                this.voiceAudio.connect(this.audioCtx.destination);
-                callback();
-            });
-        });
+    private async fetchVoice():Promise<any> {
+        const buffer:any = await this.app.binaryGet(Path.VOICE);
+        if (buffer == null) {
+            this.voiceAudio = null;
+            return;
+        }
+        this.voiceAudio = this.audioCtx.createBufferSource();
+        this.audioCtx.decodeAudioData(buffer, (audioBuffer:any) => {
+            this.voiceAudio.buffer = audioBuffer;
+            this.voiceAudio.connect(this.audioCtx.destination);
+            return;
+        })
     }
 
     private prettifyTime(seconds:number):string {

@@ -23,7 +23,7 @@ export class Join extends Section {
         this.$loginLink = $("#joinLoginLink");
 
         //TODO - Better data validation
-        this.$form.on("submit", (event:any) => {
+        this.$form.on("submit", async (event:any) => {
             event.preventDefault();
 
             let username:string = this.$usernameInp.val();
@@ -46,16 +46,15 @@ export class Join extends Section {
                 return;
             }
 
-            this.app.post(Path.JOIN, {username:username, password:password}, (data:any) => {
-                if (data.err != null) {
-                    this.app.notify(NotificationType.DANGER, data.err);
-                } else {
-                    this.$form[0].reset();
-                    this.hide();
-                    this.app.login.show();
-                    this.app.notify(NotificationType.SUCCESS, "Account created! Please login.");
-                }
-            });
+            const data:any = await this.app.post(Path.JOIN, {username:username, password:password});
+            if (data && data.err) {
+                this.app.notify(NotificationType.DANGER, data.err);
+            } else {
+                this.$form[0].reset();
+                this.hide();
+                this.app.login.show();
+                this.app.notify(NotificationType.SUCCESS, "Account created! Please login.");
+            }
         });
 
         this.$loginLink.on("click", (event:any) => {

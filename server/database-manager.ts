@@ -23,99 +23,82 @@ export class DatabaseManager {
         });
     }
 
-    public validateLogin(username:string, password:string, callback:(successful:boolean) => void):void {
-        let sql:string = 'SELECT * FROM users WHERE username=?';
-        this.pool.query(sql, [username], function(err:any, res:any[], fields:any) {
-            if (err != null) throw new Error(err);
-            if (res.length > 0) {
-                let salt:string = res[0]['salt'];
-                let hashedPassword:string = res[0]['password'];
-                if (hashedPassword === Util.hashPassword(salt, password)) { //password is correct
-                    callback(true);
-                } else {
-                    callback(false);
-                }
-            } else { // User not found
-                callback(false);
-            }
-        });
-    }
-
-    public insertUser(username:string, password:string, callback:(err:string) => void):void {
-        let salt:string = Util.generateToken(8);
-        let hashedPassword:string = Util.hashPassword(salt, password);
-        let sql:string = 'INSERT INTO USERS (username, password, salt) VALUES(?, ?, ?)';
-        this.pool.query(sql, [username, hashedPassword, salt], (err:any, res:any[], fields:any) => {
-            if (err == null) callback(null)
-            else if (err['code'] === 'ER_DUP_ENTRY') callback("Username is not available.");
-            else throw new Error(err);
-        });
-    }
-
-    public getProblem(username:string, callback:(problem:Problem) => void):void {
-        this.pool.getConnection((err:any, connection:any) => {
-            this.fetchProblemData(username, connection, (problemData:ProblemData) => {
-                if (problemData != null) {
-                    this.generateProblem(problemData, connection, (problem:Problem) => {
-                        connection.release();
-                        callback(problem);
-                    });
-                } else {
-                    connection.release();
-                    callback(null);
-                }
+    private async query(sql, data:any[] = null):Promise<any> {
+        return new Promise((accept, reject) => {
+            this.pool.query(sql, data, function(err:any, res:any[], fields:any){
+                if (err) reject(err);
+                else accept(res);
             });
         });
     }
 
-    public updateMastery(username:string, cardId:string, mastery:number, callback:() => void = null):void {
-        let nextDue:number = SrsManager.calculateNextDue(mastery);
-        let sql:string = 'UPDATE masteries SET value=?, nextDue=? WHERE username=? AND cardId=?';
-        this.pool.query(sql, [mastery, nextDue, username, cardId], (err:any, res:any[], fields:any) => {
-            if (err != null) throw new Error(err);
-            if (callback != null) callback();
-        });
+    public async validateLogin(username:string, password:string):Promise<boolean> {
+        const sql:string = 'SELECT * FROM users WHERE username=?';
+        const res = await this.query(sql, [username]);
+        if (res.length > 0) {
+            const salt:string = res[0].salt;
+            const hashedPassword:string = res[0].password;
+            return (hashedPassword === Util.hashPassword(salt, password));
+        } else {
+            return false;
+        }
     }
 
-    private generateProblem(problemData:ProblemData, connection:any, callback:(problem:Problem) => void):void {
-        let problem:Problem = new Problem();
+    public async insertUser(username:string, password:string):Promise<string> {
+        const salt:string = Util.generateToken(8);
+        const hashedPassword:string = Util.hashPassword(salt, password);
+        const sql:string = 'INSERT INTO users (username, password, salt) VALUES(?, ?, ?)';
+        try {
+            await this.query(sql, [username, hashedPassword, salt]);
+            return null;
+        } catch (e) {
+            if (e['code'] === 'ER_DUP_ENTRY') return "Username is not available.";
+            else throw new Error(e);
+        }
+    }
+
+    public async getProblem(username:string):Promise<Problem> {
+        let problemData:ProblemData = await this.fetchProblemData(username);
+        if (!problemData) return null;
+        return await this.generateProblem(problemData);
+    }
+
+    public async updateMastery(username:string, cardId:string, mastery:number):Promise<void> {
+        const nextDue:number = SrsManager.calculateNextDue(mastery);
+        const sql:string = 'UPDATE masteries SET value=?, nextDue=? WHERE username=? AND cardId=?';
+        await this.query(sql, [mastery, nextDue, username, cardId]);
+    }
+
+    private async generateProblem(problemData:ProblemData):Promise<Problem> {
+        const problem:Problem = new Problem();
         problem.id = problemData.spanish;
         problem.mastery = problemData.mastery;
         problem.worth = SrsManager.calculateProblemWorth(problemData.mastery, problemData.nextDue);
 
+        let answer:string = null;
+        let words:string[] = null;
         if (Math.random() < 0.5) { //Spanish -> English
             problem.question = problemData.spanish;
             problem.questionVoice = VoiceSynthesizer.ES_SPANISH;
             problem.answerVoice = VoiceSynthesizer.US_MALE_B;
-            let answer:string = problemData.english;
-            this.fetchRandomWords("english", 4, connection, (words:string[]) => {
-                problem.choices = words;
-                problem.answerIndex = this.finalizeChoices(words, answer);
-                callback(problem);
-            });
+            answer = problemData.english;
+            words = await this.fetchRandomWords("english", 4);
         } else { //English -> Spanish
             problem.question = problemData.english;
             problem.questionVoice = VoiceSynthesizer.US_MALE_B;
             problem.answerVoice = VoiceSynthesizer.ES_SPANISH;
-            let answer:string = problemData.spanish;
-            this.fetchRandomWords("spanish", 4, connection, (words:string[]) => {
-                problem.choices = words;
-                problem.answerIndex = this.finalizeChoices(words, answer);
-                callback(problem);
-            });
+            answer = problemData.spanish;
+            words = await this.fetchRandomWords("spanish", 4);
         }
+        problem.choices = words;
+        problem.answerIndex = this.finalizeChoices(problem.choices, answer);
+        return problem;
     }
 
-    private fetchRandomWords(fieldName:string, length:number, connection:any, callback:(words:string[]) => void):void {
-        let sql:string = `SELECT ${fieldName} FROM vocabulary ORDER BY RAND() LIMIT ${length}`;
-        connection.query(sql, (err:any, res:any[], fields:any) => {
-            if (err != null) throw new Error(err);
-            let words:string[] = [];
-            for (let item of res) {
-                words.push(item[fieldName]);
-            }
-            callback(words);
-        });
+    private async fetchRandomWords(fieldName:string, length:number):Promise<string[]> {
+        const sql:string = `SELECT ${fieldName} FROM vocabulary ORDER BY RAND() LIMIT ${length}`;
+        let words:string[] = (await this.query(sql)).map(x => x[fieldName]);
+        return words;
     }
 
     private finalizeChoices(choices:string[], answer:string):number {
@@ -124,62 +107,47 @@ export class DatabaseManager {
         return (choices.indexOf(answer));
     }
 
-    private fetchProblemData(username:string, connection:any, callback:(ProblemData:any) => void):void {
-        this.fetchRandomDueCard(username, connection, (problemData:ProblemData) => {
-            if (problemData != null) {
-                callback(problemData);
-            } else {
-                this.fetchNewCard(username, connection, (problemData:ProblemData) => {
-                    if (problemData != null) {
-                        callback(problemData);
-                    } else {
-                        this.fetchNextDueCard(username, connection, (problemData:ProblemData) => {
-                            callback(problemData);
-                        });
-                    }
-                });
-            }
-        });
+    private async fetchProblemData(username:string):Promise<ProblemData> {
+        let problemData:ProblemData = await this.fetchRandomDueCard(username);
+        if (problemData) return problemData;
+        problemData = await this.fetchNewCard(username);
+        if (problemData) return problemData;
+        problemData = await this.fetchNextDueCard(username);
+        return problemData;
     }
 
-    private fetchCard(endingSql:string, data:any[], connection:any, callback:(problemData:any) => void):void {
+    private async fetchCard(endingSql:string, data:any[]):Promise<ProblemData> {
         let sql:string = 'SELECT vocabulary.spanish, vocabulary.english, masteries.value as mastery, masteries.nextDue FROM vocabulary LEFT JOIN masteries ON vocabulary.spanish=masteries.cardId ';
         sql += endingSql;
-        
-        connection.query(sql, data, (err:any, res:any[], fields:any) => {
-            if (err) throw new Error(err);
-            if (res.length === 0) {
-                callback(null);
-            } else {
-                let result:any = res[0];
-                callback(new ProblemData(result.spanish, result.english, result.mastery, result.nextDue));
-            }
-        });
+        const res:any[] = await this.query(sql, data);
+        if (res.length > 0) {
+            const {spanish, english, mastery, nextDue} = res[0];
+            return new ProblemData(spanish, english, mastery, nextDue);
+        } else {
+            return null;
+        }
     }
 
-    private fetchRandomDueCard(username:string, connection:any, callback:(problemData:any) => void):void {
+    private async fetchRandomDueCard(username:string):Promise<ProblemData> {
         let now:number = new Date().getTime()/1000;
-        this.fetchCard('WHERE username=? AND nextDue<=? ORDER BY RAND() LIMIT 1', [username, now], connection, callback);
+        return await this.fetchCard('WHERE username=? AND nextDue<=? ORDER BY RAND() LIMIT 1', [username, now]);
     }
 
-    private fetchNewCard(username:string, connection:any, callback:(problemData:ProblemData) => void):void {
-        this.fetchCard('AND masteries.username=? WHERE masteries.value IS NULL ORDER BY RAND() LIMIT 1', [username], connection, (problemData:ProblemData) => {
-            if (problemData == null) {
-                callback(null);
-            } else {
-                problemData.mastery = 1;
-                problemData.nextDue = 0;
-                let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
-                connection.query(sql, [username, problemData.spanish, problemData.mastery, problemData.nextDue], function(err:any, res:any[], fields:any) {
-                    if (err != null) throw new Error(err);
-                    callback(problemData);
-                });
-            }
-        });
+    private async fetchNewCard(username:string):Promise<ProblemData> {
+        let problemData:ProblemData = await this.fetchCard('AND masteries.username=? WHERE masteries.value IS NULL ORDER BY RAND() LIMIT 1', [username]);
+        if (problemData == null) return null;
+
+        problemData.mastery = 1;
+        problemData.nextDue = 0;
+
+        let sql:string = 'INSERT INTO masteries (username, cardId, value, nextDue) VALUES (?, ?, ?, ?)';
+        await this.query(sql, [username, problemData.spanish, problemData.mastery, problemData.nextDue]);
+
+        return problemData;
     }
 
-    private fetchNextDueCard(username:string, connection:any, callback:(problemData:any) => void):void {
-        this.fetchCard('AND masteries.username=? ORDER BY nextDue ASC LIMIT 1', [username], connection, callback);
+    private async fetchNextDueCard(username:string):Promise<ProblemData> {
+        return await this.fetchCard('AND masteries.username=? ORDER BY nextDue ASC LIMIT 1', [username]);
     }
 }
 

@@ -36,8 +36,10 @@ export class App {
 
         window.onbeforeunload = () => {
             this.get(Path.LOGOUT, null);
-            let auth2:any = gapi.auth2.getAuthInstance();
-            auth2.signOut();
+            if (!!gapi) {
+                let auth2:any = gapi.auth2.getAuthInstance();
+                auth2.signOut();
+            }
         };
     }
 

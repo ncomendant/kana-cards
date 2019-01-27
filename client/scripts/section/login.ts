@@ -63,21 +63,19 @@ export class Login extends Section {
     }
 
     private renderGoogleLoginBtn():void {
-        if (!!gapi) {
-            gapi.signin2.render('googleBtn', {
-                scope: 'profile email',
-                longtitle: true,
-                theme: 'dark',
-                onsuccess: async (googleUser:any) => {
-                    let googleToken:string = googleUser.getAuthResponse().id_token;
-                    const data:any = await this.app.post(Path.GOOGLE_LOGIN, {googleToken:googleToken});
-                    this.completeLogin(data);
-                },
-                onfailure: () => {
-                    this.app.notify(NotificationType.DANGER, "Error occured with Google login.");
-                }
-            });
-        }
+        gapi.signin2.render('googleBtn', {
+            scope: 'profile email',
+            longtitle: true,
+            theme: 'dark',
+            onsuccess: async (googleUser:any) => {
+                let googleToken:string = googleUser.getAuthResponse().id_token;
+                const data:any = await this.app.post(Path.GOOGLE_LOGIN, {googleToken:googleToken});
+                this.completeLogin(data);
+            },
+            onfailure: () => {
+                this.app.notify(NotificationType.DANGER, "Error occured with Google login.");
+            }
+        });
     }
 
     public show():void {
